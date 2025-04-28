@@ -165,7 +165,7 @@ struct DatabaseView: View {
     var connection: Connection
     
     @State private var databases: [String] = []
-    @State private var isLoading = true
+    @State private var isLoading = false
     @State private var isConnected = false
     @State private var errorMessage: String? = nil
     @State private var selectedDatabase: String? = nil
