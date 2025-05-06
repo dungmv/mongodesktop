@@ -12,49 +12,37 @@ struct ConnectionsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var connections: [Connection]
     @State private var showingAddConnection = false
+    @State private var showingConnectionsList = false
     @State private var selectedConnection: Connection?
     
     var body: some View {
-        NavigationSplitView {
-            List(selection: $selectedConnection) {
-                ForEach(connections) { connection in
-                    NavigationLink(value: connection) {
-                        VStack(alignment: .leading) {
-                            Text(connection.name)
-                                .font(.headline)
-                            Text(connection.host + (connection.useSRV ? " (SRV)" : ":" + String(connection.port)))
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                    }
+        NavigationStack {
+            VStack {
+                if let connection = selectedConnection {
+                    DatabaseView(connection: connection)
+                } else {
+                    ContentUnavailableView("Chưa chọn kết nối", systemImage: "network", description: Text("Vui lòng chọn một kết nối MongoDB để bắt đầu"))
                 }
-                .onDelete(perform: deleteConnections)
             }
-            .navigationTitle("Connections")
+            .navigationTitle("MongoDB Desktop")
             .toolbar {
                 ToolbarItem(placement: .automatic) {
-                    Button(action: { showingAddConnection = true }) {
-                        Label("Add Connection", systemImage: "plus")
+                    Button(action: { showingConnectionsList = true }) {
+                        Label("Kết nối", systemImage: "server.rack")
                     }
                 }
+                
+                ToolbarItem(placement: .automatic) {
+                    Button(action: { showingAddConnection = true }) {
+                        Label("Thêm kết nối", systemImage: "plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingConnectionsList) {
+                ConnectionsListView(selectedConnection: $selectedConnection, isPresented: $showingConnectionsList)
             }
             .sheet(isPresented: $showingAddConnection) {
                 ConnectionFormView(connection: nil)
-            }
-        } detail: {
-            if let connection = selectedConnection {
-                DatabaseView(connection: connection)
-            } else {
-                Text("Select a connection")
-                    .foregroundColor(.secondary)
-            }
-        }
-    }
-    
-    private func deleteConnections(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(connections[index])
             }
         }
     }
@@ -165,10 +153,12 @@ struct DatabaseView: View {
     var connection: Connection
     
     @State private var databases: [String] = []
+    @State private var collections: [String] = []
     @State private var isLoading = false
     @State private var isConnected = false
     @State private var errorMessage: String? = nil
     @State private var selectedDatabase: String? = nil
+    @State private var selectedCollection: String? = nil
     
     var body: some View {
         NavigationSplitView {
@@ -187,53 +177,86 @@ struct DatabaseView: View {
                 .cornerRadius(8)
                 .padding(.horizontal)
                 
-                // Database list
-                List(selection: $selectedDatabase) {
-                    if isLoading {
-                        ProgressView("Connecting...")
-                    } else if let error = errorMessage {
-                        Text(error)
-                            .foregroundColor(.red)
-                    } else if !isConnected {
-                        Button("Connect") {
-                            Task {
-                                await connect()
-                            }
+                if !isConnected {
+                    Button("Kết nối") {
+                        Task {
+                            await connect()
                         }
-                        .buttonStyle(.borderedProminent)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                    } else if databases.isEmpty {
-                        Text("No databases found")
-                            .foregroundColor(.secondary)
-                    } else {
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding()
+                } else if isLoading {
+                    ProgressView("Đang kết nối...")
+                        .padding()
+                } else if let error = errorMessage {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .padding()
+                } else {
+                    // Database selector
+                    Picker("Cơ sở dữ liệu", selection: $selectedDatabase) {
+                        Text("Chọn cơ sở dữ liệu").tag(nil as String?)
                         ForEach(databases, id: \.self) { database in
-                            NavigationLink(value: database) {
-                                Label(database, systemImage: "server.rack")
+                            Text(database).tag(database as String?)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .padding(.horizontal)
+                    .onChange(of: selectedDatabase) { _, newValue in
+                        if let dbName = newValue {
+                            Task {
+                                await loadCollections(for: dbName)
+                            }
+                        } else {
+                            collections = []
+                        }
+                    }
+                    
+                    // Collections list
+                    List(selection: $selectedCollection) {
+                        if selectedDatabase == nil {
+                            Text("Vui lòng chọn cơ sở dữ liệu")
+                                .foregroundColor(.secondary)
+                        } else if collections.isEmpty {
+                            Text("Không tìm thấy collection")
+                                .foregroundColor(.secondary)
+                        } else {
+                            ForEach(collections, id: \.self) { collection in
+                                NavigationLink(value: collection) {
+                                    Label(collection, systemImage: "tablecells")
+                                }
                             }
                         }
                     }
+                    .listStyle(.inset)
                 }
-                .listStyle(.inset)
             }
-            .navigationTitle("Databases")
+            .navigationTitle("Collections")
             .toolbar {
                 if isConnected {
                     ToolbarItem(placement: .automatic) {
                         Button(action: {
-                            Task {
-                                await loadDatabases()
+                            if let dbName = selectedDatabase {
+                                Task {
+                                    await loadCollections(for: dbName)
+                                }
+                            } else {
+                                Task {
+                                    await loadDatabases()
+                                }
                             }
                         }) {
-                            Label("Refresh", systemImage: "arrow.clockwise")
+                            Label("Làm mới", systemImage: "arrow.clockwise")
                         }
                     }
                 }
             }
         } detail: {
-            if let database = selectedDatabase {
-                DatabaseDetailView(connection: connection, databaseName: database)
+            if let collection = selectedCollection, let database = selectedDatabase {
+                DocumentsView(connection: connection, databaseName: database, collectionName: collection)
             } else {
-                ContentUnavailableView("Select a Database", systemImage: "server.rack", description: Text("Choose a database to view its collections"))
+                ContentUnavailableView("Chọn một Collection", systemImage: "tablecells", description: Text("Chọn một collection để xem dữ liệu"))
             }
         }
         .navigationTitle(connection.name)
@@ -265,7 +288,20 @@ struct DatabaseView: View {
         do {
             databases = try await MongoDBService.shared.listDatabases(for: connection)
         } catch {
-            errorMessage = "Failed to load databases: \(error.localizedDescription)"
+            errorMessage = "Không thể tải cơ sở dữ liệu: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
+    }
+    
+    private func loadCollections(for databaseName: String) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            collections = try await MongoDBService.shared.listCollections(in: databaseName, for: connection)
+        } catch {
+            errorMessage = "Không thể tải collections: \(error.localizedDescription)"
         }
         
         isLoading = false
