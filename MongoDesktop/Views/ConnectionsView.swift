@@ -40,9 +40,17 @@ struct ConnectionsView: View {
             }
             .sheet(isPresented: $showingConnectionsList) {
                 ConnectionsListView(selectedConnection: $selectedConnection, isPresented: $showingConnectionsList)
+                    .id(UUID()) // Đảm bảo view được tạo mới mỗi khi hiển thị
+                    .presentationDetents([.height(450), .large])
+                    .presentationDragIndicator(.visible)
+                    .frame(minHeight: 450)
             }
             .sheet(isPresented: $showingAddConnection) {
                 ConnectionFormView(connection: nil)
+                    .onDisappear {
+                        // Đảm bảo danh sách kết nối được làm mới sau khi thêm kết nối mới
+                        modelContext.processPendingChanges()
+                    }
             }
         }
     }
@@ -131,6 +139,7 @@ struct ConnectionFormView: View {
             connection.authDatabase = authDatabase.isEmpty ? nil : authDatabase
             connection.useSRV = useSRV
             connection.useSSL = useSSL
+            try? modelContext.save()
         } else {
             // Create new connection
             let newConnection = Connection(
@@ -145,6 +154,7 @@ struct ConnectionFormView: View {
                 useSSL: useSSL
             )
             modelContext.insert(newConnection)
+            try? modelContext.save()
         }
     }
 }

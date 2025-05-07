@@ -16,35 +16,55 @@ struct ConnectionsListView: View {
     @Binding var selectedConnection: Connection?
     @Binding var isPresented: Bool
     
-    @State private var showingAddConnection = false
+    // Đảm bảo danh sách kết nối được làm mới khi view xuất hiện
+    @State private var refreshTrigger = false
     
     var body: some View {
         NavigationStack {
             Group {
                 if connections.isEmpty {
                     ContentUnavailableView("Không có kết nối", systemImage: "server.rack", description: Text("Bạn chưa thêm kết nối MongoDB nào"))
+                        .frame(minHeight: 300) // Đảm bảo chiều cao tối thiểu
                 } else {
+                    Text("Chọn một kết nối để tiếp tục")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                    
                     List {
                         ForEach(connections) { connection in
                             Button {
                                 selectedConnection = connection
                                 isPresented = false
                             } label: {
-                                VStack(alignment: .leading) {
+                                VStack(alignment: .leading, spacing: 6) {
                                     Text(connection.name)
                                         .font(.headline)
+                                        .foregroundColor(.primary)
                                     Text(connection.host + (connection.useSRV ? " (SRV)" : ":" + String(connection.port)))
                                         .font(.subheadline)
                                         .foregroundColor(.secondary)
                                 }
+                                .padding(.vertical, 8)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
+                                .background(Color.gray.opacity(0.05))
+                                .cornerRadius(8)
                             }
                             .buttonStyle(.plain)
+                            .padding(.vertical, 2)
                         }
                         .onDelete(perform: deleteConnections)
                     }
+                    .frame(minHeight: 300) // Đảm bảo danh sách có chiều cao tối thiểu
                 }
+            }
+            .onAppear {
+                // Đảm bảo danh sách kết nối được làm mới khi view xuất hiện
+                refreshTrigger.toggle()
+                modelContext.processPendingChanges()
+                try? modelContext.save()
             }
             .navigationTitle("Danh sách kết nối")
             .toolbar {
@@ -53,15 +73,6 @@ struct ConnectionsListView: View {
                         isPresented = false
                     }
                 }
-                
-                ToolbarItem(placement: .automatic) {
-                    Button(action: { showingAddConnection = true }) {
-                        Label("Thêm kết nối", systemImage: "plus")
-                    }
-                }
-            }
-            .sheet(isPresented: $showingAddConnection) {
-                ConnectionFormView(connection: nil)
             }
         }
     }
@@ -71,6 +82,8 @@ struct ConnectionsListView: View {
             for index in offsets {
                 modelContext.delete(connections[index])
             }
+            // Đảm bảo các thay đổi được lưu lại
+            try? modelContext.save()
         }
     }
 }
