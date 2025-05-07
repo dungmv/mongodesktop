@@ -19,6 +19,8 @@ struct ConnectionsListView: View {
     // Đảm bảo danh sách kết nối được làm mới khi view xuất hiện
     @State private var refreshTrigger = false
     @State private var showingAddConnection = false
+    @State private var connectionToEdit: Connection? = nil
+    @State private var showingEditConnection = false
     
     var body: some View {
         NavigationStack {
@@ -55,6 +57,21 @@ struct ConnectionsListView: View {
                             }
                             .buttonStyle(.plain)
                             .padding(.vertical, 2)
+                            .contextMenu {
+                                Button(action: {
+                                    editConnection(connection)
+                                }) {
+                                    Label("Chỉnh sửa", systemImage: "pencil")
+                                }
+                                
+                                Button(role: .destructive, action: {
+                                    if let index = connections.firstIndex(where: { $0 === connection }) {
+                                        deleteConnections(offsets: IndexSet(integer: index))
+                                    }
+                                }) {
+                                    Label("Xóa", systemImage: "trash")
+                                }
+                            }
                         }
                         .onDelete(perform: deleteConnections)
                     }
@@ -89,6 +106,16 @@ struct ConnectionsListView: View {
                         try? modelContext.save()
                     }
             }
+            .sheet(isPresented: $showingEditConnection) {
+                if let connectionToEdit = connectionToEdit {
+                    ConnectionFormView(connection: connectionToEdit)
+                        .onDisappear {
+                            // Đảm bảo danh sách kết nối được làm mới sau khi chỉnh sửa kết nối
+                            modelContext.processPendingChanges()
+                            try? modelContext.save()
+                        }
+                }
+            }
         }
     }
     
@@ -100,5 +127,10 @@ struct ConnectionsListView: View {
             // Đảm bảo các thay đổi được lưu lại
             try? modelContext.save()
         }
+    }
+    
+    private func editConnection(_ connection: Connection) {
+        connectionToEdit = connection
+        showingEditConnection = true
     }
 }
