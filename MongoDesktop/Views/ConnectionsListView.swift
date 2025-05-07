@@ -18,6 +18,7 @@ struct ConnectionsListView: View {
     
     // Đảm bảo danh sách kết nối được làm mới khi view xuất hiện
     @State private var refreshTrigger = false
+    @State private var showingAddConnection = false
     
     var body: some View {
         NavigationStack {
@@ -73,6 +74,20 @@ struct ConnectionsListView: View {
                         isPresented = false
                     }
                 }
+                
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: { showingAddConnection = true }) {
+                        Label("Thêm kết nối", systemImage: "plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingAddConnection) {
+                ConnectionFormView(connection: nil)
+                    .onDisappear {
+                        // Đảm bảo danh sách kết nối được làm mới sau khi thêm kết nối mới
+                        modelContext.processPendingChanges()
+                        try? modelContext.save()
+                    }
             }
         }
     }
