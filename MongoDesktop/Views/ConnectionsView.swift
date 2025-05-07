@@ -93,16 +93,27 @@ struct ConnectionFormView: View {
                     TextField("Auth Database", text: $authDatabase)
                 }
             }
-            .navigationTitle(connection == nil ? "Add Connection" : "Edit Connection")
+            .navigationTitle(connection == nil ? "Thêm kết nối" : "Chỉnh sửa kết nối")
             .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    Button("Cancel") {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Hủy") {
                         dismiss()
                     }
                 }
                 
-                ToolbarItem(placement: .automatic) {
-                    Button("Save") {
+                if connection != nil {
+                    ToolbarItem(placement: .destructiveAction) {
+                        Button(role: .destructive, action: {
+                            deleteConnection()
+                            dismiss()
+                        }) {
+                            Label("Xóa", systemImage: "trash")
+                        }
+                    }
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Lưu") {
                         saveConnection()
                         dismiss()
                     }
@@ -155,6 +166,15 @@ struct ConnectionFormView: View {
             )
             modelContext.insert(newConnection)
             try? modelContext.save()
+        }
+    }
+    
+    private func deleteConnection() {
+        if let connection = connection {
+            withAnimation {
+                modelContext.delete(connection)
+                try? modelContext.save()
+            }
         }
     }
 }
