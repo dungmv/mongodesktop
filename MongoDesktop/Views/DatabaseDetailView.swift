@@ -177,15 +177,9 @@ struct JSONTreeView: View {
     let document: BSONDocument
 
     var body: some View {
-        OutlineGroup(nodes, children: \.children) { node in
-            HStack(spacing: 8) {
-                if let key = node.key {
-                    Text("\(key):")
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(.secondary)
-                }
-                Text(node.value)
-                    .font(.system(.body, design: .monospaced))
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(nodes) { node in
+                JSONNodeView(node: node, depth: 0)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -222,6 +216,44 @@ struct JSONNode: Identifiable {
         default:
             self.value = String(describing: value)
             self.children = nil
+        }
+    }
+}
+
+struct JSONNodeView: View {
+    let node: JSONNode
+    let depth: Int
+    @State private var isExpanded: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                if node.children != nil {
+                    Button(action: { isExpanded.toggle() }) {
+                        Image(systemName: isExpanded ? "chevron.down.circle.fill" : "chevron.right.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Spacer()
+                        .frame(width: 20)
+                }
+
+                if let key = node.key {
+                    Text("\(key):")
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+                Text(node.value)
+                    .font(.system(.body, design: .monospaced))
+            }
+            .padding(.leading, CGFloat(depth) * 14)
+
+            if isExpanded, let children = node.children {
+                ForEach(children) { child in
+                    JSONNodeView(node: child, depth: depth + 1)
+                }
+            }
         }
     }
 }

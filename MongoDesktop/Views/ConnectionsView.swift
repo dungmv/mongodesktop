@@ -199,6 +199,7 @@ struct ConnectionsView: View {
     @EnvironmentObject private var connectionStore: ConnectionStore
     @EnvironmentObject private var appState: AppState
     @Environment(\.openWindow) private var openWindow
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
         ZStack {
@@ -218,97 +219,106 @@ struct ConnectionsView: View {
     }
 
     private var content: some View {
-        NavigationSplitView {
-            CollectionListView()
-        } content: {
-            Group {
-                if appState.isConnected {
-                    DatabaseDetailView()
-                } else {
-                    VStack(spacing: 12) {
-                        Text("Hãy chọn connection và kết nối từ cửa sổ Connections.")
-                            .foregroundColor(.secondary)
-                        Button("Mở Connections") {
-                            openWindow(id: "connections")
+        Group {
+            if appState.selectedConnectionId == nil {
+                ConnectionsListView()
+            } else {
+                NavigationSplitView(columnVisibility: $columnVisibility) {
+                    CollectionListView()
+                } content: {
+                    Group {
+                        if appState.isConnected {
+                            DatabaseDetailView()
+                        } else {
+                            VStack(spacing: 12) {
+                                Text("Hãy chọn connection và kết nối từ cửa sổ Connections.")
+                                    .foregroundColor(.secondary)
+                                Button("Mở Connections") {
+                                    openWindow(id: "connections")
+                                }
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-            }
-        } detail: {
-            if appState.viewMode == .table && appState.isRightSidebarVisible {
-                RightSidebarView()
-            } else {
-                EmptyView()
-            }
-        }
-        .navigationSplitViewStyle(.balanced)
-        .onChange(of: appState.viewMode) { _, newValue in
-            if newValue == .json {
-                appState.isRightSidebarVisible = false
-            } else if newValue == .table && appState.isRightSidebarVisible == false {
-                appState.isRightSidebarVisible = true
-            }
-        }
-        .overlay(alignment: .topLeading) {
-            if let error = appState.lastError {
-                Text(error)
-                    .foregroundColor(.red)
-                    .padding(12)
-                    .background(.ultraThinMaterial)
-                    .cornerRadius(8)
-                    .padding(12)
-            }
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .navigation) {
-                Button("Connections") {
-                    openWindow(id: "connections")
-                }
-                .help("Quản lý và kết nối")
-            }
-
-            ToolbarItemGroup(placement: .primaryAction) {
-                if let connection = currentConnection {
-                    Label(connection.name, systemImage: "bolt.horizontal.circle")
-                        .foregroundColor(.secondary)
-                }
-
-                if appState.isConnected {
-                    Button("Ngắt kết nối") {
-                        appState.disconnect()
+                } detail: {
+                    if appState.viewMode == .table && appState.isRightSidebarVisible {
+                        RightSidebarView()
+                    } else {
+                        EmptyView()
                     }
                 }
-
-                Button(appState.isRightSidebarVisible ? "Hide Details" : "Show Details") {
-                    appState.isRightSidebarVisible.toggle()
-                }
-                .disabled(appState.viewMode == .json)
-
-                Picker("Database", selection: $appState.selectedDatabase) {
-                    ForEach(appState.databases, id: \.self) { db in
-                        Text(db).tag(Optional(db))
+                .navigationSplitViewStyle(.balanced)
+                .onChange(of: appState.viewMode) { _, newValue in
+                    if newValue == .json {
+                        appState.isRightSidebarVisible = false
+                        columnVisibility = .doubleColumn
+                    } else if newValue == .table && appState.isRightSidebarVisible == false {
+                        appState.isRightSidebarVisible = true
+                        columnVisibility = .all
                     }
                 }
-                .pickerStyle(.menu)
-                .frame(width: 200)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .onChange(of: appState.selectedDatabase) { _, newValue in
-                    guard let newValue else { return }
-                    Task { await appState.refreshCollections(database: newValue) }
+                .overlay(alignment: .topLeading) {
+                    if let error = appState.lastError {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .padding(12)
+                            .background(.ultraThinMaterial)
+                            .cornerRadius(8)
+                            .padding(12)
+                    }
                 }
+                .toolbar {
+                    ToolbarItemGroup(placement: .navigation) {
+                        Button("Connections") {
+                            openWindow(id: "connections")
+                        }
+                        .help("Quản lý và kết nối")
+                    }
 
-                Button("Refresh DB") {
-                    Task { await appState.refreshDatabases() }
-                }
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        if let connection = currentConnection {
+                            Label(connection.name, systemImage: "bolt.horizontal.circle")
+                                .foregroundColor(.secondary)
+                        }
 
-                if appState.isLoading {
-                    ProgressView()
+                        if appState.isConnected {
+                            Button("Ngắt kết nối") {
+                                appState.disconnect()
+                            }
+                        }
+
+                        Button(appState.isRightSidebarVisible ? "Hide Details" : "Show Details") {
+                            appState.isRightSidebarVisible.toggle()
+                            columnVisibility = appState.isRightSidebarVisible ? .all : .doubleColumn
+                        }
+                        .disabled(appState.viewMode == .json)
+
+                        Picker("Database", selection: $appState.selectedDatabase) {
+                            ForEach(appState.databases, id: \.self) { db in
+                                Text(db).tag(Optional(db))
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 200)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .onChange(of: appState.selectedDatabase) { _, newValue in
+                            guard let newValue else { return }
+                            Task { await appState.refreshCollections(database: newValue) }
+                        }
+
+                        Button("Refresh DB") {
+                            Task { await appState.refreshDatabases() }
+                        }
+
+                        if appState.isLoading {
+                            ProgressView()
+                        }
+                    }
                 }
+                .toolbarBackground(.visible, for: .windowToolbar)
+                .toolbarBackground(.ultraThinMaterial, for: .windowToolbar)
             }
         }
-        .toolbarBackground(.visible, for: .windowToolbar)
-        .toolbarBackground(.ultraThinMaterial, for: .windowToolbar)
     }
 
     private var currentConnection: ConnectionProfile? {
@@ -328,11 +338,20 @@ struct RightSidebarView: View {
                         Text("Document")
                             .font(.headline)
 
-                        if let documentText = selectedDocumentText {
-                            Text(documentText)
-                                .font(.system(.body, design: .monospaced))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .textSelection(.enabled)
+                        if let fields = selectedDocumentFields, !fields.isEmpty {
+                            ForEach(fields, id: \.key) { field in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(field.key)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                    Text(field.value)
+                                        .font(.system(.body, design: .monospaced))
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .textSelection(.enabled)
+                                }
+                                .padding(10)
+                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            }
                         } else {
                             Text("Chọn một document trong bảng để xem chi tiết.")
                                 .foregroundColor(.secondary)
@@ -346,13 +365,13 @@ struct RightSidebarView: View {
         .background(.regularMaterial)
     }
 
-    private var selectedDocumentText: String? {
+    private var selectedDocumentFields: [(key: String, value: String)]? {
         guard let selectedId = appState.selectedRowIds.first else { return nil }
         let rows = appState.documents.enumerated().map { index, doc in
             DocumentRow(document: doc, fallbackIndex: index)
         }
         guard let row = rows.first(where: { $0.id == selectedId }) else { return nil }
-        return String(describing: row.document)
+        return row.document.map { (key: $0.key, value: String(describing: $0.value)) }
     }
 }
 
