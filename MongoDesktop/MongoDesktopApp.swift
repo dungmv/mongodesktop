@@ -1,32 +1,21 @@
-//
-//  MongoDesktopApp.swift
-//  MongoDesktop
-//
-//  Created by Mai Dũng on 29/4/25.
-//
-
 import SwiftUI
-import SwiftData
 
 @main
 struct MongoDesktopApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Connection.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    @StateObject private var connectionStore = ConnectionStore()
+    @StateObject private var appState = AppState()
 
     var body: some Scene {
-        WindowGroup {
-            ConnectionsView()
+        WindowGroup("Connections") {
+            ConnectionsListView()
+                .environmentObject(connectionStore)
+                .environmentObject(appState)
         }
-        .modelContainer(sharedModelContainer)
+
+        WindowGroup("Mongo Desktop", id: "main") {
+            ConnectionsView()
+                .environmentObject(connectionStore)
+                .environmentObject(appState)
+        }
     }
 }
