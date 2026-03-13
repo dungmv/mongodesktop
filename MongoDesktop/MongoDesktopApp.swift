@@ -3,19 +3,22 @@ import SwiftUI
 @main
 struct MongoDesktopApp: App {
     @StateObject private var connectionStore = ConnectionStore()
-    @StateObject private var appState = AppState()
 
     var body: some Scene {
+        // Main window: Connections list
         WindowGroup("Connections") {
             ConnectionsListView()
                 .environmentObject(connectionStore)
-                .environmentObject(appState)
         }
+        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified(showsTitle: false))
 
-        WindowGroup("Mongo Desktop", id: "main") {
-            ConnectionsView()
+        // Database windows: one per connection (opened via openWindow(value:))
+        WindowGroup("Database", for: ConnectionProfile.ID.self) { $connectionId in
+            DatabaseWindowView(connectionId: connectionId)
                 .environmentObject(connectionStore)
-                .environmentObject(appState)
         }
+        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified(showsTitle: true))
     }
 }

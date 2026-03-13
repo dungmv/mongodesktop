@@ -1,97 +1,203 @@
 import SwiftUI
 import MongoSwift
 
+// MARK: - DatabaseDetailView
+
 struct DatabaseDetailView: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            toolbarArea
             Divider()
-            content
+                .opacity(0.4)
+            contentArea
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.regularMaterial)
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    // MARK: Toolbar Area
+    private var toolbarArea: some View {
+        VStack(spacing: 0) {
+            // Breadcrumb + View Mode
             HStack(spacing: 12) {
-                Text("Documents")
-                    .font(.headline)
-
-                if let db = appState.selectedDatabase, let collection = appState.selectedCollection {
-                    Text("\(db).\(collection)")
-                        .foregroundColor(.secondary)
-                }
-
+                breadcrumb
                 Spacer()
+                viewModePicker
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
 
-                Picker("View", selection: $appState.viewMode) {
-                    ForEach(DocumentViewMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
+            // Filter Row
+            HStack(spacing: 8) {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .foregroundStyle(.secondary)
+                    .font(.body)
+
+                TextField("Filter JSON  { \"field\": \"value\" }", text: $appState.filterText)
+                    .textFieldStyle(.plain)
+                    .font(.system(.body, design: .monospaced))
+                    .frame(maxWidth: .infinity)
+
+                Button(action: runFind) {
+                    Label("Run", systemImage: "play.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 200)
+                .buttonStyle(.plain)
+                .keyboardShortcut(.return, modifiers: [.command])
+
+                Button(action: refresh) {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                        .font(.caption.weight(.medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial)
+
+            Divider()
+                .opacity(0.4)
+
+            // Pagination Row
+            paginationRow
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+        }
+        .background(.regularMaterial)
+    }
+
+    // MARK: Breadcrumb
+    private var breadcrumb: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "cylinder.split.1x2")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if let db = appState.selectedDatabase {
+                Text(db)
+                    .font(.system(.body, design: .rounded, weight: .medium))
+                    .foregroundStyle(.primary)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+
+                if let col = appState.selectedCollection {
+                    Text(col)
+                        .font(.system(.body, design: .rounded, weight: .semibold))
+                        .foregroundStyle(.primary)
+                } else {
+                    Text("Chọn collection")
+                        .font(.body)
+                        .foregroundStyle(.tertiary)
+                }
+            } else {
+                Text("Chọn database")
+                    .font(.body)
+                    .foregroundStyle(.tertiary)
             }
 
-            HStack(spacing: 12) {
-                TextField("Filter JSON, ví dụ: { \"status\": \"active\" }", text: $appState.filterText)
-                    .textFieldStyle(.roundedBorder)
-
-                Button("Run Find") {
-                    guard let db = appState.selectedDatabase,
-                          let collection = appState.selectedCollection else { return }
-                    appState.currentPage = 0
-                    Task { await appState.runFind(database: db, collection: collection) }
-                }
-
-                Button("Refresh") {
-                    guard let db = appState.selectedDatabase else { return }
-                    Task { await appState.refreshCollections(database: db) }
-                }
-            }
-
-            HStack(spacing: 12) {
-                Button("Prev") {
-                    Task { await appState.previousPage() }
-                }
-                .disabled(appState.currentPage == 0)
-
-                Text("Page \(appState.currentPage + 1)")
-                    .foregroundColor(.secondary)
-
-                Button("Next") {
-                    Task { await appState.nextPage() }
-                }
-                .disabled(!appState.hasMore)
-
-                Spacer()
-
-                Text("Limit \(appState.pageSize)")
-                    .foregroundColor(.secondary)
+            if appState.isLoading {
+                ProgressView()
+                    .scaleEffect(0.6)
+                    .padding(.leading, 4)
             }
         }
-        .padding(16)
     }
 
-    private var content: some View {
+    // MARK: View Mode Picker
+    private var viewModePicker: some View {
+        Picker("View", selection: $appState.viewMode) {
+            ForEach(DocumentViewMode.allCases) { mode in
+                Label(mode.rawValue, systemImage: mode == .table ? "tablecells" : "curlybraces")
+                    .tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 160)
+    }
+
+    // MARK: Pagination
+    private var paginationRow: some View {
+        HStack(spacing: 12) {
+            Button(action: { Task { await appState.previousPage() } }) {
+                Image(systemName: "chevron.left")
+                    .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(appState.currentPage == 0)
+
+            Text("Trang \(appState.currentPage + 1)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+
+            Button(action: { Task { await appState.nextPage() } }) {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(!appState.hasMore)
+
+            Divider()
+                .frame(height: 14)
+                .padding(.horizontal, 4)
+
+            Text("\(appState.documents.count) docs")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+
+            Spacer()
+
+            Text("Giới hạn \(appState.pageSize)")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    // MARK: Content Area
+    private var contentArea: some View {
         Group {
             if appState.selectedDatabase == nil || appState.selectedCollection == nil {
-                VStack {
-                    Text("Chọn database và collection để xem documents.")
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ContentUnavailableView(
+                    "Chọn một collection",
+                    systemImage: "tablecells",
+                    description: Text("Chọn database và collection từ sidebar để xem documents.")
+                )
             } else if appState.viewMode == .table {
                 DocumentTableView(documents: appState.documents, selection: $appState.selectedRowIds)
             } else {
                 DocumentJSONView(documents: appState.documents)
             }
         }
-        .background(.regularMaterial)
+    }
+
+    // MARK: Actions
+    private func runFind() {
+        guard let db = appState.selectedDatabase,
+              let collection = appState.selectedCollection else { return }
+        appState.currentPage = 0
+        Task { await appState.runFind(database: db, collection: collection) }
+    }
+
+    private func refresh() {
+        guard let db = appState.selectedDatabase else { return }
+        Task { await appState.refreshCollections(database: db) }
     }
 }
+
+// MARK: - DocumentRow
 
 struct DocumentRow: Identifiable {
     let id: String
@@ -106,6 +212,8 @@ struct DocumentRow: Identifiable {
         }
     }
 }
+
+// MARK: - DocumentTableView
 
 struct DocumentTableView: View {
     let rows: [DocumentRow]
@@ -125,53 +233,116 @@ struct DocumentTableView: View {
 
     var body: some View {
         if columns.isEmpty {
-            emptyState
+            ContentUnavailableView(
+                "Không có document",
+                systemImage: "doc.text",
+                description: Text("Collection này chưa có dữ liệu hoặc filter không khớp.")
+            )
         } else {
             Table(rows, selection: $selection) {
                 TableColumnForEach(columns, id: \.self) { key in
                     TableColumn(key) { row in
                         Text(displayValue(row.document[key]))
                             .lineLimit(1)
+                            .truncationMode(.tail)
                     }
                 }
             }
-            .tableStyle(.inset)
-            .padding(8)
+            .tableStyle(.inset(alternatesRowBackgrounds: true))
         }
-    }
-
-    private var emptyState: some View {
-        VStack {
-            Text("Không có document nào.")
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func displayValue(_ value: BSON?) -> String {
         guard let value else { return "" }
         return String(describing: value)
     }
-
 }
+
+// MARK: - DocumentJSONView
 
 struct DocumentJSONView: View {
     let documents: [BSONDocument]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                ForEach(Array(documents.enumerated()), id: \.offset) { _, doc in
-                    JSONTreeView(document: doc)
-                        .padding(12)
-                        .background(Color.black.opacity(0.04))
-                        .cornerRadius(8)
+        if documents.isEmpty {
+            ContentUnavailableView(
+                "Không có document",
+                systemImage: "curlybraces",
+                description: Text("Collection này chưa có dữ liệu hoặc filter không khớp.")
+            )
+        } else {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(documents.enumerated()), id: \.offset) { index, doc in
+                        JSONDocumentCard(index: index, document: doc)
+                    }
                 }
+                .padding(16)
             }
-            .padding(16)
         }
     }
 }
+
+// MARK: - JSONDocumentCard
+
+struct JSONDocumentCard: View {
+    let index: Int
+    let document: BSONDocument
+    @State private var isExpanded: Bool = true
+
+    private var nodes: [JSONNode] {
+        document.map { JSONNode(key: $0.key, value: $0.value) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Card header
+            HStack(spacing: 8) {
+                Button(action: { withAnimation(.spring(duration: 0.25)) { isExpanded.toggle() } }) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 16)
+                }
+                .buttonStyle(.plain)
+
+                Text("Document \(index + 1)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                if let idValue = document["_id"] {
+                    Text(String(describing: idValue))
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial)
+
+            if isExpanded {
+                Divider().opacity(0.4)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(nodes) { node in
+                        JSONNodeView(node: node, depth: 0)
+                    }
+                }
+                .padding(12)
+            }
+        }
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.primary.opacity(0.07), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - JSONTreeView
 
 struct JSONTreeView: View {
     let document: BSONDocument
@@ -186,15 +357,11 @@ struct JSONTreeView: View {
     }
 
     private var nodes: [JSONNode] {
-        buildNodes(from: document)
-    }
-
-    private func buildNodes(from document: BSONDocument) -> [JSONNode] {
-        document.map { key, value in
-            JSONNode(key: key, value: value)
-        }
+        document.map { JSONNode(key: $0.key, value: $0.value) }
     }
 }
+
+// MARK: - JSONNode
 
 struct JSONNode: Identifiable {
     let id = UUID()
@@ -206,10 +373,10 @@ struct JSONNode: Identifiable {
         self.key = key
         switch value {
         case .document(let doc):
-            self.value = "{ }"
+            self.value = "{ \(doc.count) fields }"
             self.children = doc.map { JSONNode(key: $0.key, value: $0.value) }
         case .array(let array):
-            self.value = "[ ]"
+            self.value = "[ \(array.count) items ]"
             self.children = array.enumerated().map { index, item in
                 JSONNode(key: "[\(index)]", value: item)
             }
@@ -220,34 +387,51 @@ struct JSONNode: Identifiable {
     }
 }
 
+// MARK: - JSONNodeView
+
 struct JSONNodeView: View {
     let node: JSONNode
     let depth: Int
     @State private var isExpanded: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
+                // Indent
+                if depth > 0 {
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.1))
+                        .frame(width: 1)
+                        .padding(.horizontal, 7)
+                }
+
                 if node.children != nil {
-                    Button(action: { isExpanded.toggle() }) {
+                    Button(action: { withAnimation(.spring(duration: 0.2)) { isExpanded.toggle() } }) {
                         Image(systemName: isExpanded ? "chevron.down.circle.fill" : "chevron.right.circle.fill")
-                            .foregroundColor(.secondary)
+                            .font(.caption)
+                            .foregroundStyle(Color.accentColor.opacity(0.7))
                     }
                     .buttonStyle(.plain)
                 } else {
-                    Spacer()
-                        .frame(width: 20)
+                    Circle()
+                        .fill(Color.primary.opacity(0.2))
+                        .frame(width: 5, height: 5)
+                        .padding(.horizontal, 4)
                 }
 
                 if let key = node.key {
                     Text("\(key):")
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(.secondary)
+                        .font(.system(.callout, design: .monospaced))
+                        .foregroundStyle(Color(red: 0.4, green: 0.7, blue: 1.0))
                 }
+
                 Text(node.value)
-                    .font(.system(.body, design: .monospaced))
+                    .font(.system(.callout, design: .monospaced))
+                    .foregroundStyle(valueColor)
+                    .textSelection(.enabled)
+                    .lineLimit(1)
             }
-            .padding(.leading, CGFloat(depth) * 14)
+            .padding(.leading, CGFloat(depth) * 16)
 
             if isExpanded, let children = node.children {
                 ForEach(children) { child in
@@ -255,5 +439,15 @@ struct JSONNodeView: View {
                 }
             }
         }
+    }
+
+    private var valueColor: Color {
+        if node.children != nil { return .secondary }
+        let v = node.value
+        if v.hasPrefix("\"") { return Color(red: 0.8, green: 0.6, blue: 0.3) }
+        if v == "true" || v == "false" { return Color(red: 0.4, green: 0.85, blue: 0.5) }
+        if v == "null" { return Color(red: 0.7, green: 0.4, blue: 0.4) }
+        if Double(v) != nil { return Color(red: 0.6, green: 0.85, blue: 0.7) }
+        return .primary
     }
 }
