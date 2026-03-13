@@ -115,7 +115,7 @@ struct DatabaseDetailView: View {
 
     // MARK: View Mode Picker
     private var viewModePicker: some View {
-        Picker("View", selection: $appState.viewMode) {
+        Picker("", selection: $appState.viewMode) {
             ForEach(DocumentViewMode.allCases) { mode in
                 Label(mode.rawValue, systemImage: mode == .table ? "tablecells" : "curlybraces")
                     .tag(mode)

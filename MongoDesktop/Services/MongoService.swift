@@ -27,13 +27,33 @@ actor MongoService {
     }
 
     func disconnect() async throws {
+        // Close the Mongo client in a non-blocking way
         if let client {
-            try? client.syncClose()
+            // Offload potential blocking close to a detached task
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                Task.detached {
+                    do {
+                        try client.syncClose()
+                        continuation.resume()
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
             self.client = nil
         }
 
+        // Shut down the EventLoopGroup without blocking the async context
         if let eventLoopGroup {
-            try? eventLoopGroup.syncShutdownGracefully()
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                eventLoopGroup.shutdownGracefully { error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume()
+                    }
+                }
+            }
             self.eventLoopGroup = nil
         }
 
@@ -78,3 +98,4 @@ enum MongoServiceError: LocalizedError {
         }
     }
 }
+
