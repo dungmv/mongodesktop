@@ -22,6 +22,8 @@ final class AppState: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var lastError: String?
     @Published var connectionName: String = ""
+    @Published var serverVersion: String = ""
+    @Published var lastQueryDuration: TimeInterval? = nil  // seconds
 
     func connect(using connection: ConnectionProfile, store: ConnectionStore) {
         isLoading = true
@@ -38,7 +40,10 @@ final class AppState: ObservableObject {
                     statusMessage = "Đã kết nối: \(connection.name)"
                     store.markConnected(connection.id)
                 }
+                // Fetch server version in parallel with databases
+                async let versionFetch: () = fetchServerVersion()
                 await refreshDatabases()
+                await versionFetch
             } catch {
                 await MainActor.run {
                     isConnected = false
@@ -60,6 +65,17 @@ final class AppState: ObservableObject {
             documents = []
             selectedDatabase = nil
             selectedCollection = nil
+            serverVersion = ""
+            lastQueryDuration = nil
+        }
+    }
+
+    func fetchServerVersion() async {
+        do {
+            let version = try await MongoService.shared.serverVersion()
+            await MainActor.run { serverVersion = version }
+        } catch {
+            // Non-critical – ignore
         }
     }
 
@@ -95,7 +111,8 @@ final class AppState: ObservableObject {
     }
 
     func runFind(database: String, collection: String) async {
-        await MainActor.run { isLoading = true; lastError = nil }
+        await MainActor.run { isLoading = true; lastError = nil; lastQueryDuration = nil }
+        let start = Date()
         do {
             let filter = try parseFilter(filterText)
             let skip = currentPage * pageSize
@@ -103,10 +120,12 @@ final class AppState: ObservableObject {
                 database: database, collection: collection,
                 filter: filter, limit: pageSize, skip: skip
             )
+            let elapsed = Date().timeIntervalSince(start)
             await MainActor.run {
                 documents = docs
                 hasMore = docs.count == pageSize
                 selectedRowIds = []
+                lastQueryDuration = elapsed
             }
         } catch {
             await MainActor.run { lastError = error.localizedDescription }
@@ -237,38 +256,34 @@ struct DatabaseBrowserView: View {
         .navigationSplitViewStyle(.balanced)
         .navigationTitle(appState.connectionName)
         .toolbar {
+            // Group 1 (navigation): connection name, database picker, refresh
             ToolbarItemGroup(placement: .navigation) {
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Circle()
                         .fill(Color.green)
-                        .frame(width: 8, height: 8)
+                        .frame(width: 7, height: 7)
                     Text(appState.connectionName)
                         .font(.headline)
                         .foregroundStyle(.primary)
                 }
-            }
 
-            ToolbarItemGroup(placement: .primaryAction) {
-                if appState.isLoading {
-                    ProgressView().scaleEffect(0.8)
-                }
+                Divider()
+                    .frame(height: 16)
+                    .padding(.horizontal, 2)
 
-                Picker("Database", selection: $appState.selectedDatabase) {
-                    ForEach(appState.databases, id: \.self) { db in
-                        Text(db).tag(Optional(db))
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(width: 180)
-                .onChange(of: appState.selectedDatabase) { _, newValue in
-                    guard let newValue else { return }
-                    Task { await appState.refreshCollections(database: newValue) }
-                }
+                DatabasePickerButton()
+                    .environmentObject(appState)
 
                 Button(action: { Task { await appState.refreshDatabases() } }) {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+                    Image(systemName: "arrow.clockwise")
                 }
                 .help("Refresh databases")
+            }
+
+            // Group 2 (trailing): server info + loading/query time
+            ToolbarItemGroup(placement: .primaryAction) {
+                QueryStatusView()
+                    .environmentObject(appState)
             }
         }
         .toolbarBackground(.visible, for: .windowToolbar)
@@ -283,6 +298,199 @@ struct DatabaseBrowserView: View {
         }
     }
 }
+
+// MARK: - DatabasePickerButton
+
+struct DatabasePickerButton: View {
+    @EnvironmentObject private var appState: AppState
+    @State private var isPresented = false
+    @State private var searchText = ""
+
+    private var filtered: [String] {
+        searchText.isEmpty
+            ? appState.databases
+            : appState.databases.filter { $0.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    var body: some View {
+        Button(action: { isPresented.toggle() }) {
+            HStack(spacing: 5) {
+                Image(systemName: "cylinder.split.1x2")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Text(appState.selectedDatabase ?? "Chọn database")
+                    .font(.system(.body, design: .rounded, weight: .medium))
+                    .foregroundStyle(appState.selectedDatabase == nil ? .secondary : .primary)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $isPresented, arrowEdge: .bottom) {
+            DatabasePickerPopover(
+                databases: filtered,
+                selected: appState.selectedDatabase,
+                searchText: $searchText,
+                onSelect: { db in
+                    isPresented = false
+                    appState.selectedDatabase = db
+                    Task { await appState.refreshCollections(database: db) }
+                }
+            )
+        }
+    }
+}
+
+// MARK: - DatabasePickerPopover
+
+struct DatabasePickerPopover: View {
+    let databases: [String]
+    let selected: String?
+    @Binding var searchText: String
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Search field
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                    .font(.callout)
+                TextField("Tìm database...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.callout)
+                if !searchText.isEmpty {
+                    Button(action: { searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            if databases.isEmpty {
+                Text(searchText.isEmpty ? "Không có database" : "Không tìm thấy")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(20)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(databases, id: \.self) { db in
+                            DatabasePickerRow(
+                                name: db,
+                                isSelected: selected == db,
+                                onTap: { onSelect(db) }
+                            )
+                        }
+                    }
+                    .padding(6)
+                }
+                .frame(maxHeight: 260)
+            }
+        }
+        .frame(minWidth: 220)
+        .background(.regularMaterial)
+    }
+}
+
+// MARK: - DatabasePickerRow
+
+struct DatabasePickerRow: View {
+    let name: String
+    let isSelected: Bool
+    let onTap: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "cylinder.split.1x2")
+                .font(.caption)
+                .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                .frame(width: 16)
+            Text(name)
+                .font(.system(.body, design: .rounded))
+                .foregroundStyle(.primary)
+            Spacer()
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(isSelected
+                      ? Color.accentColor.opacity(0.12)
+                      : (isHovered ? Color.primary.opacity(0.06) : Color.clear))
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .onTapGesture { onTap() }
+        .onHover { isHovered = $0 }
+    }
+}
+
+// MARK: - QueryStatusView
+
+struct QueryStatusView: View {
+    @EnvironmentObject private var appState: AppState
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if appState.isLoading {
+                ProgressView()
+                    .scaleEffect(0.75)
+                    .transition(.opacity)
+            } else if let duration = appState.lastQueryDuration {
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(formattedDuration(duration))
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                .transition(.opacity)
+            }
+
+            if !appState.serverVersion.isEmpty {
+                Divider()
+                    .frame(height: 14)
+                    .opacity(appState.isLoading || appState.lastQueryDuration != nil ? 1 : 0)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "leaf.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green.opacity(0.8))
+                    Text("mongo \(appState.serverVersion)")
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: appState.isLoading)
+        .animation(.easeInOut(duration: 0.2), value: appState.lastQueryDuration)
+    }
+
+    private func formattedDuration(_ seconds: TimeInterval) -> String {
+        if seconds < 1 {
+            return "\(Int(seconds * 1000))ms"
+        } else {
+            return String(format: "%.2fs", seconds)
+        }
+    }
+}
+
 
 // MARK: - CollectionSidebarView
 

@@ -74,6 +74,15 @@ actor MongoService {
         return collections.map { $0.name }.sorted()
     }
 
+    func serverVersion() async throws -> String {
+        guard let client else { throw MongoServiceError.notConnected }
+        let result = try await client.db("admin").runCommand(["buildInfo": 1])
+        if case let .string(version) = result["version"] {
+            return version
+        }
+        return "unknown"
+    }
+
     func findDocuments(database: String, collection: String, filter: BSONDocument, limit: Int = 100, skip: Int = 0) async throws -> [BSONDocument] {
         guard let client else { throw MongoServiceError.notConnected }
         let db = client.db(database)
