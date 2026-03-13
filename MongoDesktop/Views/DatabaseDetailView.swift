@@ -288,7 +288,6 @@ struct DocumentJSONView: View {
 struct JSONDocumentCard: View {
     let index: Int
     let document: BSONDocument
-    @State private var isExpanded: Bool = true
 
     private var nodes: [JSONNode] {
         document.map { JSONNode(key: $0.key, value: $0.value) }
@@ -296,43 +295,14 @@ struct JSONDocumentCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Card header
-            HStack(spacing: 8) {
-                Button(action: { withAnimation(.spring(duration: 0.25)) { isExpanded.toggle() } }) {
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 16)
-                }
-                .buttonStyle(.plain)
+            Divider().opacity(0.4)
 
-                Text("Document \(index + 1)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
-                if let idValue = document["_id"] {
-                    Text(String(describing: idValue))
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+            VStack(alignment: .leading, spacing: 3) {
+                ForEach(nodes) { node in
+                    JSONNodeView(node: node, depth: 0)
                 }
-                Spacer()
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.ultraThinMaterial)
-
-            if isExpanded {
-                Divider().opacity(0.4)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    ForEach(nodes) { node in
-                        JSONNodeView(node: node, depth: 0)
-                    }
-                }
-                .padding(12)
-            }
+            .padding(12)
         }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
