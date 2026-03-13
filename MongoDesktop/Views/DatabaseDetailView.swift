@@ -170,11 +170,15 @@ struct DatabaseDetailView: View {
     private var contentArea: some View {
         Group {
             if appState.selectedDatabase == nil || appState.selectedCollection == nil {
-                ContentUnavailableView(
-                    "Chọn một collection",
-                    systemImage: "tablecells",
-                    description: Text("Chọn database và collection từ sidebar để xem documents.")
-                )
+                VStack {
+                    ContentUnavailableView(
+                        "Chọn một collection",
+                        systemImage: "tablecells",
+                        description: Text("Chọn database và collection từ sidebar để xem documents.")
+                    )
+                    .padding(.top, 40)
+                    Spacer()
+                }
             } else if appState.viewMode == .table {
                 DocumentTableView(documents: appState.documents, selection: $appState.selectedRowIds)
             } else {
@@ -233,11 +237,15 @@ struct DocumentTableView: View {
 
     var body: some View {
         if columns.isEmpty {
-            ContentUnavailableView(
-                "Không có document",
-                systemImage: "doc.text",
-                description: Text("Collection này chưa có dữ liệu hoặc filter không khớp.")
-            )
+            VStack {
+                ContentUnavailableView(
+                    "Không có document",
+                    systemImage: "doc.text",
+                    description: Text("Collection này chưa có dữ liệu hoặc filter không khớp.")
+                )
+                .padding(.top, 40)
+                Spacer()
+            }
         } else {
             Table(rows, selection: $selection) {
                 TableColumnForEach(columns, id: \.self) { key in
@@ -265,11 +273,15 @@ struct DocumentJSONView: View {
 
     var body: some View {
         if documents.isEmpty {
-            ContentUnavailableView(
-                "Không có document",
-                systemImage: "curlybraces",
-                description: Text("Collection này chưa có dữ liệu hoặc filter không khớp.")
-            )
+            VStack {
+                ContentUnavailableView(
+                    "Không có document",
+                    systemImage: "curlybraces",
+                    description: Text("Collection này chưa có dữ liệu hoặc filter không khớp.")
+                )
+                .padding(.top, 40)
+                Spacer()
+            }
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
