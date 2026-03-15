@@ -229,6 +229,40 @@ struct DocumentTableView: View {
         return first.document.map { $0.key }
     }
 
+    private func typeString(for key: String) -> String {
+        var observedTypes = Set<String>()
+        for row in rows {
+            if let value = row.document[key] {
+                observedTypes.insert(typeName(for: value))
+            }
+        }
+        if observedTypes.isEmpty { return "Unknown" }
+        if observedTypes.count == 1 { return observedTypes.first! }
+        return "Mixed"
+    }
+
+    private func typeName(for value: BSON) -> String {
+        switch value {
+        case .double: return "Double"
+        case .string: return "String"
+        case .document: return "Object"
+        case .array: return "Array"
+        case .binary: return "Binary"
+        case .objectID: return "ObjectId"
+        case .bool: return "Bool"
+        case .datetime: return "Date"
+        case .null: return "Null"
+        case .regex: return "Regex"
+        case .int32: return "Int32"
+        case .timestamp: return "Timestamp"
+        case .int64: return "Int64"
+        case .decimal128: return "Decimal"
+        case .maxKey: return "MaxKey"
+        case .minKey: return "MinKey"
+        default: return "Unknown"
+        }
+    }
+
     var body: some View {
         if columns.isEmpty {
             VStack {
@@ -243,7 +277,7 @@ struct DocumentTableView: View {
         } else {
             Table(rows, selection: $selection) {
                 TableColumnForEach(columns, id: \.self) { key in
-                    TableColumn(key) { row in
+                    TableColumn("\(key) \(typeString(for: key))") { row in
                         Text(displayValue(row.document[key]))
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -256,7 +290,28 @@ struct DocumentTableView: View {
 
     private func displayValue(_ value: BSON?) -> String {
         guard let value else { return "" }
-        return String(describing: value)
+        switch value {
+        case .document(let doc):
+            return "{} \(doc.count) fields"
+        case .array(let arr):
+            return "[] \(arr.count) items"
+        case .string(let s):
+            return s
+        case .double(let d):
+            return String(d)
+        case .int32(let i):
+            return String(i)
+        case .int64(let i):
+            return String(i)
+        case .bool(let b):
+            return String(b)
+        case .null:
+            return "null"
+        case .datetime(let d):
+            return d.description
+        default:
+            return String(describing: value)
+        }
     }
 }
 
