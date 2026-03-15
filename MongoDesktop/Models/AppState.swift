@@ -25,6 +25,13 @@ final class AppState: ObservableObject {
     @Published var serverVersion: String = ""
     @Published var lastQueryDuration: TimeInterval? = nil
 
+    deinit {
+        // Ensure the Mongo client is closed if the window/app is torn down.
+        Task {
+            try? await MongoService.shared.disconnect()
+        }
+    }
+
     func connect(using connection: ConnectionProfile, store: ConnectionStore) {
         isLoading = true
         lastError = nil

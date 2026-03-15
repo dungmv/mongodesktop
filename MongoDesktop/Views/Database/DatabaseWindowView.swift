@@ -21,6 +21,11 @@ struct DatabaseWindowView: View {
             }
         }
         .onAppear { connectOnAppear() }
+        .onDisappear {
+            Task {
+                try? await windowState.disconnect()
+            }
+        }
         .frame(minWidth: 900, minHeight: 600)
     }
 

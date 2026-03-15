@@ -18,19 +18,6 @@ struct DatabaseBrowserView: View {
         .navigationTitle(appState.connectionName)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 7, height: 7)
-                    Text(appState.connectionName)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                }
-
-                Divider()
-                    .frame(height: 16)
-                    .padding(.horizontal, 2)
-
                 DatabasePickerButton()
                     .environmentObject(appState)
 
@@ -117,39 +104,24 @@ struct QueryStatusView: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        HStack(spacing: 8) {
-            if appState.isLoading || appState.lastQueryDuration != nil {
-                ZStack(alignment: .trailing) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "clock").font(.caption)
-                        Text("99.99s").font(.system(.caption, design: .monospaced))
-                    }
-                    .opacity(0)
-                    .accessibilityHidden(true)
-
-                    if appState.isLoading {
-                        ProgressView()
-                            .scaleEffect(0.75)
-                            .transition(.opacity)
-                    } else if let duration = appState.lastQueryDuration {
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(formattedDuration(duration))
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                        }
-                        .transition(.opacity)
-                    }
-                }
+        HStack(spacing: 12) {
+            // Connection Name
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 7, height: 7)
+                Text(appState.connectionName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
             }
 
-            if !appState.serverVersion.isEmpty {
+            if !appState.serverVersion.isEmpty || appState.isLoading || appState.lastQueryDuration != nil {
                 Divider()
                     .frame(height: 14)
-                    .opacity(appState.isLoading || appState.lastQueryDuration != nil ? 1 : 0)
+            }
 
+            // Server Version
+            if !appState.serverVersion.isEmpty {
                 HStack(spacing: 4) {
                     Image(systemName: "leaf.fill")
                         .font(.caption)
@@ -158,6 +130,33 @@ struct QueryStatusView: View {
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            // Query Status
+            ZStack(alignment: .trailing) {
+                // Fixed placeholder width to prevent layout shift
+                HStack(spacing: 4) {
+                    Image(systemName: "clock").font(.caption)
+                    Text("0s").font(.system(.caption, design: .monospaced))
+                }
+                .opacity(0)
+                .accessibilityHidden(true)
+
+                // Query Duration
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(appState.lastQueryDuration.map { formattedDuration($0) } ?? "0ms")
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                .opacity(appState.isLoading ? 0 : (appState.lastQueryDuration != nil ? 1 : 0))
+
+                // Loading Indicator
+                ProgressView()
+                    .scaleEffect(0.6)
+                    .opacity(appState.isLoading ? 1 : 0)
             }
         }
         .animation(.easeInOut(duration: 0.2), value: appState.isLoading)
