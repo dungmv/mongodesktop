@@ -10,8 +10,7 @@ struct MongoDesktopApp: App {
             ConnectionsListView()
                 .environmentObject(connectionStore)
         }
-        .windowStyle(.hiddenTitleBar)
-        .windowToolbarStyle(.unified(showsTitle: false))
+        .defaultSize(width: 720, height: 500)
 
         // Database windows: one per connection (opened via openWindow(value:))
         WindowGroup("Database", for: ConnectionProfile.ID.self) { $connectionId in

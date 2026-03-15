@@ -104,12 +104,6 @@ struct DatabaseDetailView: View {
                     .font(.body)
                     .foregroundStyle(.tertiary)
             }
-
-            if appState.isLoading {
-                ProgressView()
-                    .scaleEffect(0.6)
-                    .padding(.leading, 4)
-            }
         }
     }
 

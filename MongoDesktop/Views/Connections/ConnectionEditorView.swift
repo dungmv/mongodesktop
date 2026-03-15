@@ -1,0 +1,248 @@
+import SwiftUI
+
+// MARK: - EditorMode
+
+enum EditorMode: Identifiable {
+    case create
+    case edit(UUID)
+    var id: String {
+        switch self {
+        case .create: return "create"
+        case .edit(let id): return "edit-\(id.uuidString)"
+        }
+    }
+}
+
+// MARK: - ConnectionDraft
+
+struct ConnectionDraft {
+    var name: String = ""
+    var host: String = "localhost"
+    var port: String = "27017"
+    var username: String = ""
+    var password: String = ""
+    var database: String = ""
+    var authDatabase: String = ""
+    var useSRV: Bool = false
+    var useSSL: Bool = false
+
+    init() {}
+
+    init(from connection: ConnectionProfile) {
+        name = connection.name
+        host = connection.host
+        port = String(connection.port)
+        username = connection.username
+        password = connection.password
+        database = connection.database
+        authDatabase = connection.authDatabase
+        useSRV = connection.useSRV
+        useSSL = connection.useSSL
+    }
+
+    /// Parse a MongoDB URI string into a draft
+    init(fromURI uri: String) {
+        let trimmed = uri.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Detect SRV
+        if trimmed.hasPrefix("mongodb+srv://") {
+            useSRV = true
+        }
+
+        // Detect SSL/TLS from query params
+        if trimmed.contains("ssl=true") || trimmed.contains("tls=true") {
+            useSSL = true
+        }
+
+        // Parse using URLComponents (replace mongodb:// with http:// for parsing)
+        var httpURI = trimmed
+        if httpURI.hasPrefix("mongodb+srv://") {
+            httpURI = "http://" + httpURI.dropFirst("mongodb+srv://".count)
+        } else if httpURI.hasPrefix("mongodb://") {
+            httpURI = "http://" + httpURI.dropFirst("mongodb://".count)
+        }
+
+        guard let components = URLComponents(string: httpURI) else { return }
+
+        if let user = components.user, !user.isEmpty {
+            username = user
+        }
+        if let pass = components.password, !pass.isEmpty {
+            password = pass
+        }
+        if let h = components.host, !h.isEmpty {
+            host = h
+        }
+        if let p = components.port {
+            port = String(p)
+        } else if useSRV {
+            port = ""
+        }
+
+        // Path = database name
+        let path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if !path.isEmpty {
+            database = path
+        }
+
+        // Check authSource in query
+        if let queryItems = components.queryItems {
+            for item in queryItems {
+                if item.name == "authSource", let val = item.value, !val.isEmpty {
+                    authDatabase = val
+                }
+            }
+        }
+
+        // Generate name from host
+        name = host
+    }
+
+    func build(id: UUID = UUID()) -> ConnectionProfile {
+        ConnectionProfile(
+            id: id,
+            name: name.isEmpty ? host : name,
+            host: host.isEmpty ? "localhost" : host,
+            port: Int(port) ?? 27017,
+            username: username,
+            password: password,
+            database: database,
+            authDatabase: authDatabase,
+            useSRV: useSRV,
+            useSSL: useSSL
+        )
+    }
+}
+
+// MARK: - ConnectionEditorView
+
+struct ConnectionEditorView: View {
+    let mode: EditorMode
+    @Binding var draft: ConnectionDraft
+    let onSave: (EditorMode) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(modeTitle)
+                        .font(.title2.weight(.bold))
+                    Text("Nhập thông tin kết nối MongoDB")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .padding(.bottom, 20)
+
+            Divider()
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    formSection(title: "Thông tin cơ bản") {
+                        VStack(spacing: 12) {
+                            formField(label: "Tên connection") {
+                                TextField("Ví dụ: Production DB", text: $draft.name)
+                            }
+                            formField(label: "Host") {
+                                TextField("localhost", text: $draft.host)
+                            }
+                            HStack(spacing: 12) {
+                                formField(label: "Port") {
+                                    TextField("27017", text: $draft.port)
+                                        .disabled(draft.useSRV)
+                                }
+                                .frame(maxWidth: 120)
+
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Options")
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(.secondary)
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Toggle("Dùng SRV (mongodb+srv)", isOn: $draft.useSRV)
+                                        Toggle("TLS/SSL", isOn: $draft.useSSL)
+                                    }
+                                    .font(.callout)
+                                }
+                            }
+                        }
+                    }
+
+                    Divider().padding(.horizontal, 24)
+
+                    formSection(title: "Xác thực") {
+                        VStack(spacing: 12) {
+                            HStack(spacing: 12) {
+                                formField(label: "Username") {
+                                    TextField("Tùy chọn", text: $draft.username)
+                                }
+                                formField(label: "Password") {
+                                    SecureField("Tùy chọn", text: $draft.password)
+                                }
+                            }
+                            formField(label: "Database mặc định") {
+                                TextField("Tùy chọn", text: $draft.database)
+                            }
+                            formField(label: "Auth Database") {
+                                TextField("Mặc định: admin", text: $draft.authDatabase)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+
+            Divider()
+
+            // Footer buttons
+            HStack {
+                Spacer()
+                Button("Hủy") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Lưu") { onSave(mode); dismiss() }
+                    .keyboardShortcut(.return, modifiers: [])
+                    .buttonStyle(.borderedProminent)
+                    .disabled(draft.host.isEmpty)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 16)
+        }
+        .frame(width: 540)
+        .background(.regularMaterial)
+    }
+
+    private var modeTitle: String {
+        switch mode {
+        case .create: return "Thêm connection"
+        case .edit: return "Sửa connection"
+        }
+    }
+
+    @ViewBuilder
+    private func formSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            content()
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+    }
+
+    @ViewBuilder
+    private func formField<Content: View>(label: String, @ViewBuilder field: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+            field()
+                .textFieldStyle(.roundedBorder)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
