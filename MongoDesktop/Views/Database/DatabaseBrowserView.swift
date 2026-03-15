@@ -105,21 +105,6 @@ struct QueryStatusView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Connection Name
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 7, height: 7)
-                Text(appState.connectionName)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-            }
-
-            if !appState.serverVersion.isEmpty || appState.isLoading || appState.lastQueryDuration != nil {
-                Divider()
-                    .frame(height: 14)
-            }
-
             // Server Version
             if !appState.serverVersion.isEmpty {
                 HStack(spacing: 4) {
@@ -130,6 +115,36 @@ struct QueryStatusView: View {
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
+                
+                Divider().frame(height: 14)
+            }
+
+            // Connection Name
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 7, height: 7)
+                Text(appState.connectionName)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+            }
+
+            // Database Name
+            if let db = appState.selectedDatabase {
+                Divider().frame(height: 14)
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "cylinder.split.1x2")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(db)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                }
+            }
+
+            if appState.isLoading || appState.lastQueryDuration != nil {
+                Divider().frame(height: 14)
             }
 
             // Query Status
@@ -161,6 +176,7 @@ struct QueryStatusView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: appState.isLoading)
         .animation(.easeInOut(duration: 0.2), value: appState.lastQueryDuration)
+        .animation(.easeInOut(duration: 0.2), value: appState.selectedDatabase)
     }
 
     private func formattedDuration(_ seconds: TimeInterval) -> String {

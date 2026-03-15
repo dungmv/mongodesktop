@@ -15,22 +15,9 @@ struct DatabasePickerButton: View {
 
     var body: some View {
         Button(action: { isPresented.toggle() }) {
-            HStack(spacing: 5) {
-                Image(systemName: "cylinder.split.1x2")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                Text(appState.selectedDatabase ?? "Chọn database")
-                    .font(.system(.body, design: .rounded, weight: .medium))
-                    .foregroundStyle(appState.selectedDatabase == nil ? .secondary : .primary)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            Image(systemName: "cylinder.split.1x2")
         }
-        .buttonStyle(.plain)
+        .help("Chọn/Đổi database")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             DatabasePickerPopover(
                 databases: filtered,
