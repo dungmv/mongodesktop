@@ -19,7 +19,7 @@ struct ConnectionsListView: View {
             detailContent
         }
         .navigationSplitViewStyle(.balanced)
-        .frame(minWidth: 700, minHeight: 460)
+        .frame(minWidth: 480, idealWidth: 700, minHeight: 320, idealHeight: 400)
         .sheet(item: $editorMode) { mode in
             ConnectionEditorView(mode: mode, draft: $draft, onSave: saveDraft)
         }
@@ -153,14 +153,20 @@ struct ConnectionsListView: View {
     // MARK: - Connection List
 
     private var connectionList: some View {
-        List(connectionStore.connections, selection: $selectedId) { connection in
-            ConnectionRow(connection: connection, onConnect: {
-                openWindow(value: connection.id)
-            })
-            .tag(connection.id)
+        ScrollView {
+            LazyVStack(spacing: 4) {
+                ForEach(connectionStore.connections) { connection in
+                    ConnectionRow(
+                        connection: connection,
+                        isSelected: selectedId == connection.id,
+                        onSelect: { selectedId = connection.id },
+                        onConnect: { openWindow(value: connection.id) }
+                    )
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
-        .listStyle(.inset(alternatesRowBackgrounds: true))
-        .scrollContentBackground(.hidden)
     }
 
     // MARK: - Empty State
@@ -228,23 +234,27 @@ struct ConnectionsListView: View {
 
 struct ConnectionRow: View {
     let connection: ConnectionProfile
+    let isSelected: Bool
+    let onSelect: () -> Void
     let onConnect: () -> Void
+    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: 12) {
             // Icon
             Image(systemName: "server.rack")
                 .font(.title3)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(isSelected ? .white : .secondary)
                 .frame(width: 28)
 
             // Info
             VStack(alignment: .leading, spacing: 2) {
                 Text(connection.name)
                     .font(.system(.body, design: .rounded, weight: .medium))
+                    .foregroundStyle(isSelected ? .white : .primary)
                 Text(connection.connectionString)
                     .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(isSelected ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.tertiary))
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -252,12 +262,28 @@ struct ConnectionRow: View {
             Spacer()
 
             // Connect button
-            Button("Connect", action: onConnect)
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+            if isSelected {
+                Button("Connect", action: onConnect)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.white)
+                    .foregroundStyle(.black)
+                    .controlSize(.small)
+            } else {
+                Button("Connect", action: onConnect)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .opacity(isHovered ? 1 : 0.6)
+            }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isSelected ? Color.accentColor : (isHovered ? Color.primary.opacity(0.05) : Color.clear))
+        )
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) { onConnect() }
+        .onHover { isHovered = $0 }
+        .onTapGesture { onSelect() }
+        .simultaneousGesture(TapGesture(count: 2).onEnded { onConnect() })
     }
 }
