@@ -26,6 +26,18 @@ actor MongoService {
         self.connectedURI = uri
     }
 
+    func testConnection(uri: String) async throws {
+        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        let client = try MongoClient(uri, using: elg)
+        do {
+            _ = try await client.db("admin").runCommand(["ping": 1])
+            try await closeTemporaryClient(client, elg)
+        } catch {
+            try? await closeTemporaryClient(client, elg)
+            throw error
+        }
+    }
+
     func disconnect() async throws {
         // Close the Mongo client in a non-blocking way
         if let client {
@@ -58,6 +70,29 @@ actor MongoService {
         }
 
         connectedURI = nil
+    }
+
+    private func closeTemporaryClient(_ client: MongoClient, _ eventLoopGroup: MultiThreadedEventLoopGroup) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            Task.detached {
+                do {
+                    try client.syncClose()
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            eventLoopGroup.shutdownGracefully { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }
+        }
     }
 
     func listDatabases() async throws -> [String] {
@@ -107,4 +142,3 @@ enum MongoServiceError: LocalizedError {
         }
     }
 }
-

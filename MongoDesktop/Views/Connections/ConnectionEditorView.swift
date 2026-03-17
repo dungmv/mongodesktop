@@ -121,6 +121,10 @@ struct ConnectionEditorView: View {
     @Binding var draft: ConnectionDraft
     let onSave: (EditorMode) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var isTestingConnection = false
+    @State private var showTestAlert = false
+    @State private var testAlertTitle = ""
+    @State private var testAlertMessage = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -134,10 +138,17 @@ struct ConnectionEditorView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
             }
             .padding(.horizontal, 24)
-            .padding(.top, 24)
-            .padding(.bottom, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 12)
 
             Divider()
 
@@ -201,8 +212,17 @@ struct ConnectionEditorView: View {
             // Footer buttons
             HStack {
                 Spacer()
-                Button("Hủy") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
+                Button(action: runTestConnection) {
+                    HStack(spacing: 8) {
+                        if isTestingConnection {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text(isTestingConnection ? "Đang kiểm tra..." : "Kiểm tra kết nối")
+                    }
+                }
+                .disabled(draft.host.isEmpty || isTestingConnection)
+                .buttonStyle(.bordered)
                 Button("Lưu") { onSave(mode); dismiss() }
                     .keyboardShortcut(.return, modifiers: [])
                     .buttonStyle(.borderedProminent)
@@ -213,6 +233,11 @@ struct ConnectionEditorView: View {
         }
         .frame(width: 540)
         .background(.regularMaterial)
+        .alert(testAlertTitle, isPresented: $showTestAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(testAlertMessage)
+        }
     }
 
     private var modeTitle: String {
@@ -244,5 +269,28 @@ struct ConnectionEditorView: View {
                 .textFieldStyle(.roundedBorder)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func runTestConnection() {
+        isTestingConnection = true
+        let uri = draft.build().connectionString
+        Task {
+            do {
+                try await MongoService.shared.testConnection(uri: uri)
+                await MainActor.run {
+                    testAlertTitle = "Kết nối thành công"
+                    testAlertMessage = "Đã ping MongoDB thành công."
+                    showTestAlert = true
+                    isTestingConnection = false
+                }
+            } catch {
+                await MainActor.run {
+                    testAlertTitle = "Kết nối thất bại"
+                    testAlertMessage = error.localizedDescription
+                    showTestAlert = true
+                    isTestingConnection = false
+                }
+            }
+        }
     }
 }
