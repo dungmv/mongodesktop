@@ -125,6 +125,9 @@ struct ConnectionEditorView: View {
     @State private var showTestAlert = false
     @State private var testAlertTitle = ""
     @State private var testAlertMessage = ""
+    @State private var isDebuggingDNS = false
+    @State private var showDNSDebug = false
+    @State private var dnsDebugText = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -223,6 +226,17 @@ struct ConnectionEditorView: View {
                 }
                 .disabled(draft.host.isEmpty || isTestingConnection)
                 .buttonStyle(.bordered)
+                Button(action: runDNSDebug) {
+                    HStack(spacing: 8) {
+                        if isDebuggingDNS {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text(isDebuggingDNS ? "Đang debug..." : "Debug DNS")
+                    }
+                }
+                .disabled(draft.host.isEmpty || isDebuggingDNS)
+                .buttonStyle(.bordered)
                 Button("Lưu") { onSave(mode); dismiss() }
                     .keyboardShortcut(.return, modifiers: [])
                     .buttonStyle(.borderedProminent)
@@ -237,6 +251,9 @@ struct ConnectionEditorView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(testAlertMessage)
+        }
+        .sheet(isPresented: $showDNSDebug) {
+            DNSDebugSheet(text: dnsDebugText)
         }
     }
 
@@ -292,5 +309,46 @@ struct ConnectionEditorView: View {
                 }
             }
         }
+    }
+
+    private func runDNSDebug() {
+        isDebuggingDNS = true
+        dnsDebugText = ""
+        let uri = draft.build().connectionString
+        Task {
+            let text = await MongoService.shared.debugDNS(uri: uri)
+            await MainActor.run {
+                dnsDebugText = text
+                showDNSDebug = true
+                isDebuggingDNS = false
+            }
+        }
+    }
+}
+
+private struct DNSDebugSheet: View {
+    let text: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("DNS Debug")
+                    .font(.headline)
+                Spacer()
+                Button("Đóng") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
+            .padding(.bottom, 4)
+
+            ScrollView {
+                Text(text.isEmpty ? "Không có dữ liệu." : text)
+                    .font(.system(.body, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(minHeight: 300)
+        }
+        .padding(20)
+        .frame(width: 640, height: 480)
     }
 }
