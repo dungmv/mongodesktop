@@ -1,5 +1,5 @@
 import SwiftUI
-import MongoSwift
+import SwiftBSON
 
 // MARK: - DatabaseDetailView
 
