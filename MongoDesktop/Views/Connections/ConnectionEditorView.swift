@@ -125,6 +125,8 @@ struct ConnectionEditorView: View {
     @State private var showTestAlert = false
     @State private var testAlertTitle = ""
     @State private var testAlertMessage = ""
+    @State private var showTestDebug = false
+    @State private var testDebugText = ""
     @State private var isDebuggingDNS = false
     @State private var showDNSDebug = false
     @State private var dnsDebugText = ""
@@ -248,9 +250,15 @@ struct ConnectionEditorView: View {
         .frame(width: 540)
         .background(.regularMaterial)
         .alert(testAlertTitle, isPresented: $showTestAlert) {
+            if !testDebugText.isEmpty {
+                Button("Chi tiết") { showTestDebug = true }
+            }
             Button("OK", role: .cancel) {}
         } message: {
             Text(testAlertMessage)
+        }
+        .sheet(isPresented: $showTestDebug) {
+            DNSDebugSheet(text: testDebugText)
         }
         .sheet(isPresented: $showDNSDebug) {
             DNSDebugSheet(text: dnsDebugText)
@@ -290,6 +298,7 @@ struct ConnectionEditorView: View {
 
     private func runTestConnection() {
         isTestingConnection = true
+        testDebugText = ""
         let uri = draft.build().connectionString
         Task {
             do {
@@ -301,9 +310,11 @@ struct ConnectionEditorView: View {
                     isTestingConnection = false
                 }
             } catch {
+                let debugText = await MongoService.shared.debugConnection(uri: uri)
                 await MainActor.run {
                     testAlertTitle = "Kết nối thất bại"
                     testAlertMessage = error.localizedDescription
+                    testDebugText = debugText
                     showTestAlert = true
                     isTestingConnection = false
                 }
@@ -329,6 +340,7 @@ struct ConnectionEditorView: View {
 private struct DNSDebugSheet: View {
     let text: String
     @Environment(\.dismiss) private var dismiss
+    @State private var didCopy = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -336,6 +348,12 @@ private struct DNSDebugSheet: View {
                 Text("DNS Debug")
                     .font(.headline)
                 Spacer()
+                if didCopy {
+                    Text("Đã copy")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Button("Copy") { copyText() }
                 Button("Đóng") { dismiss() }
                     .keyboardShortcut(.cancelAction)
             }
@@ -345,10 +363,21 @@ private struct DNSDebugSheet: View {
                 Text(text.isEmpty ? "Không có dữ liệu." : text)
                     .font(.system(.body, design: .monospaced))
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
             }
             .frame(minHeight: 300)
         }
         .padding(20)
         .frame(width: 640, height: 480)
+    }
+
+    private func copyText() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        didCopy = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            didCopy = false
+        }
     }
 }

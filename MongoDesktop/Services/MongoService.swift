@@ -23,9 +23,7 @@ actor MongoService {
         try await disconnect()
         ensureInitialized()
 
-        guard let newClient = mongoc_client_new(uri) else {
-            throw MongoServiceError.connectionFailed("Không thể khởi tạo Mongo client.")
-        }
+        let newClient = try createClient(uri: uri)
 
         do {
             try ping(client: newClient)
@@ -40,15 +38,48 @@ actor MongoService {
 
     func testConnection(uri: String) async throws {
         ensureInitialized()
-        guard let tempClient = mongoc_client_new(uri) else {
-            throw MongoServiceError.connectionFailed("Không thể khởi tạo Mongo client.")
-        }
+        let tempClient = try createClient(uri: uri)
         defer { mongoc_client_destroy(tempClient) }
         try ping(client: tempClient)
     }
 
     func debugDNS(uri: String) async -> String {
         await DNSDebugService.debug(uri: uri)
+    }
+
+    func debugConnection(uri: String) async -> String {
+        ensureInitialized()
+        let redacted = redactedURI(uri)
+        var lines: [String] = []
+        lines.append("Mongo Connection Debug")
+        lines.append("URI: \(redacted)")
+        lines.append("isSRV: \(uri.lowercased().hasPrefix("mongodb+srv://"))")
+        var error = bson_error_t()
+        if let parsed = mongoc_uri_new_with_error(uri, &error) {
+            mongoc_uri_destroy(parsed)
+            lines.append("Parse URI: OK")
+        } else {
+            lines.append("Parse URI: FAILED")
+            let msg = errorMessage(error)
+            lines.append("Error: \(msg.isEmpty ? "(empty)" : msg)")
+            lines.append("Domain: \(error.domain)  Code: \(error.code)")
+        }
+        // Try create client to surface any SRV resolution / option issues.
+        var createError = bson_error_t()
+        if let parsed = mongoc_uri_new_with_error(uri, &createError) {
+            let client = mongoc_client_new_from_uri_with_error(parsed, &createError)
+            if let client {
+                mongoc_client_destroy(client)
+                lines.append("Create Client: OK")
+            } else {
+                let msg = errorMessage(createError)
+                lines.append("Create Client: FAILED")
+                lines.append("Error: \(msg.isEmpty ? "(empty)" : msg)")
+                lines.append("Domain: \(createError.domain)  Code: \(createError.code)")
+            }
+            mongoc_uri_destroy(parsed)
+        }
+        return lines.joined(separator: "\n")
     }
 
     func disconnect() async throws {
@@ -198,6 +229,24 @@ actor MongoService {
         return client
     }
 
+    private func createClient(uri: String) throws -> OpaquePointer {
+        var error = bson_error_t()
+        guard let parsed = mongoc_uri_new_with_error(uri, &error) else {
+            let msg = errorMessage(error)
+            let detail = msg.isEmpty ? "Không thể parse URI." : "Không thể parse URI: \(msg)"
+            throw MongoServiceError.connectionFailed("\(detail)\nURI: \(redactedURI(uri))\nDomain: \(error.domain)  Code: \(error.code)")
+        }
+        defer { mongoc_uri_destroy(parsed) }
+
+        var createError = bson_error_t()
+        guard let client = mongoc_client_new_from_uri_with_error(parsed, &createError) else {
+            let msg = errorMessage(createError)
+            let detail = msg.isEmpty ? "Không thể khởi tạo Mongo client." : "Không thể khởi tạo Mongo client: \(msg)"
+            throw MongoServiceError.connectionFailed("\(detail)\nURI: \(redactedURI(uri))\nDomain: \(createError.domain)  Code: \(createError.code)")
+        }
+        return client
+    }
+
     private func bsonFromJSON(_ json: String) throws -> UnsafeMutablePointer<bson_t> {
         var error = bson_error_t()
         let result = json.withCString { ptr in
@@ -222,6 +271,20 @@ actor MongoService {
         return withUnsafePointer(to: &mutableError.message) { ptr in
             ptr.withMemoryRebound(to: CChar.self, capacity: 1) { String(cString: $0) }
         }
+    }
+
+    private func redactedURI(_ uri: String) -> String {
+        guard let schemeRange = uri.range(of: "://") else { return uri }
+        let scheme = uri[..<schemeRange.upperBound]
+        let rest = uri[schemeRange.upperBound...]
+        guard let atIndex = rest.firstIndex(of: "@") else { return uri }
+        let userInfo = rest[..<atIndex]
+        let hostAndPath = rest[atIndex...]
+        if let colonIndex = userInfo.firstIndex(of: ":") {
+            let user = userInfo[..<colonIndex]
+            return "\(scheme)\(user):******\(hostAndPath)"
+        }
+        return "\(scheme)\(userInfo)\(hostAndPath)"
     }
 }
 
