@@ -59,8 +59,8 @@
 			buildPhases = (
 				5C3182C62DBFF006004C59B0 /* Sources */,
 				5C3182C72DBFF006004C59B0 /* Frameworks */,
-				5C7E9A3E2F1A123400ABCDEF /* Embed Mongo C Driver */,
 				5C3182C82DBFF006004C59B0 /* Resources */,
+				5C7E9A3E2F1A123400ABCDEF /* Embed Mongo C Driver */,
 			);
 			buildRules = (
 			);
