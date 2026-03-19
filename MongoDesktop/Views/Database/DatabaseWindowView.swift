@@ -32,7 +32,9 @@ struct DatabaseWindowView: View {
     private var connectingView: some View {
         VStack(spacing: 16) {
             ProgressView()
-                .scaleEffect(1.2)
+                .controlSize(.large)
+                .frame(width: 20, height: 20)
+                .fixedSize()
             Text("Đang kết nối…")
                 .font(.headline)
                 .foregroundStyle(.secondary)

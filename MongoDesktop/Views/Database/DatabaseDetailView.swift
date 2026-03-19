@@ -225,8 +225,19 @@ struct DocumentTableView: View {
     }
 
     private var columns: [String] {
-        guard let first = rows.first else { return [] }
-        return first.document.map { $0.key }
+        guard !rows.isEmpty else { return [] }
+        var keys = Set<String>()
+        for row in rows {
+            for pair in row.document {
+                keys.insert(pair.key)
+            }
+        }
+        if keys.isEmpty { return [] }
+        return keys.sorted { lhs, rhs in
+            if lhs == "_id" { return true }
+            if rhs == "_id" { return false }
+            return lhs.localizedStandardCompare(rhs) == .orderedAscending
+        }
     }
 
     private func typeString(for key: String) -> String {
@@ -285,6 +296,7 @@ struct DocumentTableView: View {
                 }
             }
             .tableStyle(.inset(alternatesRowBackgrounds: true))
+            .id(columns)
         }
     }
 

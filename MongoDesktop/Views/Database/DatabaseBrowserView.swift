@@ -170,7 +170,9 @@ struct QueryStatusView: View {
 
                 // Loading Indicator
                 ProgressView()
-                    .scaleEffect(0.6)
+                    .controlSize(.mini)
+                    .frame(width: 12, height: 12)
+                    .fixedSize()
                     .opacity(appState.isLoading ? 1 : 0)
             }
         }
