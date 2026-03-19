@@ -9,6 +9,10 @@ enum DNSDebugService {
         let target: String
     }
 
+    struct TXTRecord {
+        let items: [String: String]
+    }
+
     static func debug(uri: String) async -> String {
         var lines: [String] = []
         lines.append("DNS Debug")
@@ -53,6 +57,21 @@ enum DNSDebugService {
                         }
                     }
                 }
+                lines.append("")
+                lines.append("TXT lookup: \(parsedHost)")
+                do {
+                    let txt = try await queryTXT(name: parsedHost)
+                    if txt.items.isEmpty {
+                        lines.append("TXT records: none")
+                    } else {
+                        lines.append("TXT records:")
+                        for (k, v) in txt.items.sorted(by: { $0.key < $1.key }) {
+                            lines.append("- \(k)=\(v)")
+                        }
+                    }
+                } catch {
+                    lines.append("TXT query error: \(error.localizedDescription)")
+                }
             } catch {
                 lines.append("SRV query error: \(error.localizedDescription)")
             }
@@ -73,6 +92,13 @@ enum DNSDebugService {
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    static func resolveSRVAndTXT(host: String) async -> ([SRVRecord], TXTRecord) {
+        let srvName = "_mongodb._tcp.\(host)"
+        let records = (try? await querySRV(name: srvName)) ?? []
+        let txt = (try? await queryTXT(name: host)) ?? TXTRecord(items: [:])
+        return (records, txt)
     }
 
     private static func parseHost(from uri: String) -> String? {
@@ -131,6 +157,51 @@ enum DNSDebugService {
         }
     }
 
+    private static func queryTXT(name: String) async throws -> TXTRecord {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                let context = TXTQueryContext()
+                let contextPtr = Unmanaged.passRetained(context).toOpaque()
+
+                var serviceRef: DNSServiceRef?
+                let queryResult = DNSServiceQueryRecord(
+                    &serviceRef,
+                    0,
+                    0,
+                    name,
+                    UInt16(kDNSServiceType_TXT),
+                    UInt16(kDNSServiceClass_IN),
+                    txtQueryCallback,
+                    contextPtr
+                )
+
+                guard queryResult == kDNSServiceErr_NoError, let ref = serviceRef else {
+                    Unmanaged<TXTQueryContext>.fromOpaque(contextPtr).release()
+                    continuation.resume(throwing: DNSError(code: queryResult))
+                    return
+                }
+
+                while !context.done {
+                    let processResult = DNSServiceProcessResult(ref)
+                    if processResult != kDNSServiceErr_NoError {
+                        context.errorCode = processResult
+                        break
+                    }
+                }
+
+                DNSServiceRefDeallocate(ref)
+                Unmanaged<TXTQueryContext>.fromOpaque(contextPtr).release()
+
+                if context.errorCode != kDNSServiceErr_NoError {
+                    continuation.resume(throwing: DNSError(code: context.errorCode))
+                    return
+                }
+
+                continuation.resume(returning: TXTRecord(items: context.items))
+            }
+        }
+    }
+
     private static let srvQueryCallback: DNSServiceQueryRecordReply = { _, flags, _, errorCode, _, rrtype, _, rdlen, rdata, _, context in
         guard let context else { return }
         let ctx = Unmanaged<QueryContext>.fromOpaque(context).takeUnretainedValue()
@@ -152,6 +223,28 @@ enum DNSDebugService {
         }
     }
 
+    private static let txtQueryCallback: DNSServiceQueryRecordReply = { _, flags, _, errorCode, _, rrtype, _, rdlen, rdata, _, context in
+        guard let context else { return }
+        let ctx = Unmanaged<TXTQueryContext>.fromOpaque(context).takeUnretainedValue()
+
+        if errorCode != kDNSServiceErr_NoError {
+            ctx.errorCode = errorCode
+            ctx.done = true
+            return
+        }
+
+        if rrtype == UInt16(kDNSServiceType_TXT), let rdata, rdlen > 0 {
+            let items = parseTXTRecord(rdata: rdata, length: Int(rdlen))
+            for (k, v) in items {
+                ctx.items[k] = v
+            }
+        }
+
+        if flags & kDNSServiceFlagsMoreComing == 0 {
+            ctx.done = true
+        }
+    }
+
     private static func parseSRVRecord(rdata: UnsafeRawPointer, length: Int) -> SRVRecord? {
         let bytes = rdata.bindMemory(to: UInt8.self, capacity: length)
         guard length >= 7 else { return nil }
@@ -165,6 +258,28 @@ enum DNSDebugService {
         guard !target.isEmpty else { return nil }
 
         return SRVRecord(priority: priority, weight: weight, port: port, target: target)
+    }
+
+    private static func parseTXTRecord(rdata: UnsafeRawPointer, length: Int) -> [String: String] {
+        let bytes = rdata.bindMemory(to: UInt8.self, capacity: length)
+        var index = 0
+        var result: [String: String] = [:]
+        while index < length {
+            let len = Int(bytes[index])
+            index += 1
+            if len <= 0 || index + len > length { break }
+            let slice = UnsafeBufferPointer(start: bytes.advanced(by: index), count: len)
+            let entry = String(bytes: slice, encoding: .utf8) ?? ""
+            if let eq = entry.firstIndex(of: "=") {
+                let key = String(entry[..<eq])
+                let value = String(entry[entry.index(after: eq)...])
+                if !key.isEmpty {
+                    result[key] = value
+                }
+            }
+            index += len
+        }
+        return result
     }
 
     private static func parseDomainName(bytes: UnsafePointer<UInt8>, length: Int) -> String {
@@ -227,6 +342,12 @@ enum DNSDebugService {
 
     private final class QueryContext {
         var records: [SRVRecord] = []
+        var done: Bool = false
+        var errorCode: DNSServiceErrorType = DNSServiceErrorType(kDNSServiceErr_NoError)
+    }
+
+    private final class TXTQueryContext {
+        var items: [String: String] = [:]
         var done: Bool = false
         var errorCode: DNSServiceErrorType = DNSServiceErrorType(kDNSServiceErr_NoError)
     }
