@@ -47,10 +47,6 @@ actor MongoService {
         try ping(client: tempClient)
     }
 
-    func debugDNS(uri: String) async -> String {
-        await DNSDebugService.debug(uri: uri)
-    }
-
     func debugConnection(uri: String) async -> String {
         ensureInitialized()
         let redacted = redactedURI(uri)

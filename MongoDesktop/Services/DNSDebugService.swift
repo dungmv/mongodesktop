@@ -13,103 +13,11 @@ enum DNSDebugService {
         let items: [String: String]
     }
 
-    static func debug(uri: String) async -> String {
-        var lines: [String] = []
-        lines.append("DNS Debug")
-        lines.append("Input URI: \(uri)")
-
-        guard let parsedHost = parseHost(from: uri) else {
-            lines.append("Error: Cannot parse host from URI.")
-            return lines.joined(separator: "\n")
-        }
-
-        lines.append("Parsed host: \(parsedHost)")
-        let isSRV = uri.lowercased().hasPrefix("mongodb+srv://")
-        lines.append("Scheme: \(isSRV ? "mongodb+srv" : "mongodb")")
-
-        if isSRV {
-            let srvName = "_mongodb._tcp.\(parsedHost)"
-            lines.append("SRV lookup: \(srvName)")
-            do {
-                let records = try await querySRV(name: srvName)
-                if records.isEmpty {
-                    lines.append("SRV records: none")
-                } else {
-                    lines.append("SRV records (\(records.count)):")
-                    for record in records {
-                        lines.append("- \(record.target):\(record.port) (priority \(record.priority), weight \(record.weight))")
-                    }
-                }
-
-                for record in records {
-                    lines.append("")
-                    lines.append("Resolve target: \(record.target)")
-                    let (ips, error) = resolveHost(record.target)
-                    if ips.isEmpty {
-                        lines.append("A/AAAA: none")
-                        if let error {
-                            lines.append("getaddrinfo error: \(error)")
-                        }
-                    } else {
-                        lines.append("A/AAAA:")
-                        for ip in ips {
-                            lines.append("- \(ip)")
-                        }
-                    }
-                }
-                lines.append("")
-                lines.append("TXT lookup: \(parsedHost)")
-                do {
-                    let txt = try await queryTXT(name: parsedHost)
-                    if txt.items.isEmpty {
-                        lines.append("TXT records: none")
-                    } else {
-                        lines.append("TXT records:")
-                        for (k, v) in txt.items.sorted(by: { $0.key < $1.key }) {
-                            lines.append("- \(k)=\(v)")
-                        }
-                    }
-                } catch {
-                    lines.append("TXT query error: \(error.localizedDescription)")
-                }
-            } catch {
-                lines.append("SRV query error: \(error.localizedDescription)")
-            }
-        } else {
-            lines.append("Resolve host: \(parsedHost)")
-            let (ips, error) = resolveHost(parsedHost)
-            if ips.isEmpty {
-                lines.append("A/AAAA: none")
-                if let error {
-                    lines.append("getaddrinfo error: \(error)")
-                }
-            } else {
-                lines.append("A/AAAA:")
-                for ip in ips {
-                    lines.append("- \(ip)")
-                }
-            }
-        }
-
-        return lines.joined(separator: "\n")
-    }
-
     static func resolveSRVAndTXT(host: String) async -> ([SRVRecord], TXTRecord) {
         let srvName = "_mongodb._tcp.\(host)"
         let records = (try? await querySRV(name: srvName)) ?? []
         let txt = (try? await queryTXT(name: host)) ?? TXTRecord(items: [:])
         return (records, txt)
-    }
-
-    private static func parseHost(from uri: String) -> String? {
-        var httpURI = uri.trimmingCharacters(in: .whitespacesAndNewlines)
-        if httpURI.hasPrefix("mongodb+srv://") {
-            httpURI = "http://" + httpURI.dropFirst("mongodb+srv://".count)
-        } else if httpURI.hasPrefix("mongodb://") {
-            httpURI = "http://" + httpURI.dropFirst("mongodb://".count)
-        }
-        guard let components = URLComponents(string: httpURI) else { return nil }
-        return components.host
     }
 
     private static func querySRV(name: String) async throws -> [SRVRecord] {
