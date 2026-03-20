@@ -41,6 +41,13 @@ struct DatabaseDetailView: View {
                     .font(.system(.body, design: .monospaced))
                     .frame(maxWidth: .infinity)
 
+                Button(action: { withAnimation(.easeInOut(duration: 0.2)) { appState.isAdvancedQuery.toggle() } }) {
+                    Label(appState.isAdvancedQuery ? "Simple" : "Advanced", systemImage: "slider.horizontal.3")
+                        .font(.caption.weight(.medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
                 Button(action: runFind) {
                     Label("Run", systemImage: "play.fill")
                         .font(.caption.weight(.semibold))
@@ -63,6 +70,13 @@ struct DatabaseDetailView: View {
             .padding(.vertical, 8)
             .background(.ultraThinMaterial)
 
+            if appState.isAdvancedQuery {
+                advancedQueryRow
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(.ultraThinMaterial)
+            }
+
             Divider()
                 .opacity(0.4)
 
@@ -72,6 +86,28 @@ struct DatabaseDetailView: View {
                 .padding(.vertical, 6)
         }
         .background(.regularMaterial)
+    }
+
+    private var advancedQueryRow: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+
+            TextField("Sort JSON  { \"field\": 1 }", text: $appState.sortText)
+                .textFieldStyle(.plain)
+                .font(.system(.callout, design: .monospaced))
+                .frame(maxWidth: .infinity)
+
+            Divider()
+                .frame(height: 16)
+                .opacity(0.5)
+
+            TextField("Projection JSON  { \"field\": 1 }", text: $appState.projectionText)
+                .textFieldStyle(.plain)
+                .font(.system(.callout, design: .monospaced))
+                .frame(maxWidth: .infinity)
+        }
     }
 
     // MARK: Breadcrumb

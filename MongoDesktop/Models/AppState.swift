@@ -14,7 +14,10 @@ final class AppState: ObservableObject {
     @Published var selectedDatabase: String?
     @Published var selectedCollection: String?
     @Published var filterText: String = "{}"
-    @Published var viewMode: DocumentViewMode = .table
+    @Published var sortText: String = "{}"
+    @Published var projectionText: String = "{}"
+    @Published var isAdvancedQuery: Bool = false
+    @Published var viewMode: DocumentViewMode = .json
     @Published var pageSize: Int = 100
     @Published var currentPage: Int = 0
     @Published var hasMore: Bool = false
@@ -121,10 +124,13 @@ final class AppState: ObservableObject {
         let start = Date()
         do {
             let filter = try parseFilter(filterText)
+            let sort = isAdvancedQuery ? try parseQueryOption(sortText) : nil
+            let projection = isAdvancedQuery ? try parseQueryOption(projectionText) : nil
             let skip = currentPage * pageSize
             let docs = try await MongoService.shared.findDocuments(
                 database: database, collection: collection,
-                filter: filter, limit: pageSize, skip: skip
+                filter: filter, sort: sort, projection: projection,
+                limit: pageSize, skip: skip
             )
             let elapsed = Date().timeIntervalSince(start)
             await MainActor.run {
@@ -142,6 +148,12 @@ final class AppState: ObservableObject {
     func parseFilter(_ text: String) throws -> BSONDocument {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty || trimmed == "{}" { return BSONDocument() }
+        return try BSONDocument(fromJSON: trimmed)
+    }
+
+    func parseQueryOption(_ text: String) throws -> BSONDocument? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed == "{}" { return nil }
         return try BSONDocument(fromJSON: trimmed)
     }
 

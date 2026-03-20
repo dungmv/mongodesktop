@@ -140,7 +140,15 @@ actor MongoService {
         return "unknown"
     }
 
-    func findDocuments(database: String, collection: String, filter: BSONDocument, limit: Int = 100, skip: Int = 0) async throws -> [BSONDocument] {
+    func findDocuments(
+        database: String,
+        collection: String,
+        filter: BSONDocument,
+        sort: BSONDocument? = nil,
+        projection: BSONDocument? = nil,
+        limit: Int = 100,
+        skip: Int = 0
+    ) async throws -> [BSONDocument] {
         let client = try requireClient()
         guard let db = mongoc_client_get_database(client, database) else {
             throw MongoServiceError.commandFailed("Không thể mở database '\(database)'.")
@@ -160,7 +168,24 @@ actor MongoService {
         bson_init(&opts)
         bson_append_int64(&opts, "limit", -1, Int64(limit))
         bson_append_int64(&opts, "skip", -1, Int64(skip))
-        defer { bson_destroy(&opts) }
+
+        var sortBson: UnsafeMutablePointer<bson_t>?
+        var projectionBson: UnsafeMutablePointer<bson_t>?
+        if let sort, !sort.isEmpty {
+            let json = sort.toCanonicalExtendedJSONString()
+            sortBson = try bsonFromJSON(json)
+            bson_append_document(&opts, "sort", -1, sortBson)
+        }
+        if let projection, !projection.isEmpty {
+            let json = projection.toCanonicalExtendedJSONString()
+            projectionBson = try bsonFromJSON(json)
+            bson_append_document(&opts, "projection", -1, projectionBson)
+        }
+        defer {
+            if let sortBson { bson_destroy(sortBson) }
+            if let projectionBson { bson_destroy(projectionBson) }
+            bson_destroy(&opts)
+        }
 
         guard let cursor = mongoc_collection_find_with_opts(coll, filterBson, &opts, nil) else {
             throw MongoServiceError.queryFailed("Không thể tạo cursor.")
