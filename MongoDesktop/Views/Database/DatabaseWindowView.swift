@@ -25,6 +25,10 @@ struct DatabaseWindowView: View {
             Task {
                 try? await windowState.disconnect()
             }
+            // Hiện lại cửa sổ Connections khi Database window đóng
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                WindowCoordinator.shared.showConnectionsWindow()
+            }
         }
         .frame(minWidth: 900, minHeight: 600)
     }

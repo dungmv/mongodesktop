@@ -160,7 +160,13 @@ struct ConnectionsListView: View {
                         connection: connection,
                         isSelected: selectedId == connection.id,
                         onSelect: { selectedId = connection.id },
-                        onConnect: { openWindow(value: connection.id) }
+                        onConnect: {
+                            openWindow(value: connection.id)
+                            // Ẩn cửa sổ Connections sau khi mở Database window
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                WindowCoordinator.shared.hideConnectionsWindow()
+                            }
+                        }
                     )
                 }
             }
@@ -218,8 +224,11 @@ struct ConnectionsListView: View {
         connectionStore.add(profile)
         importURI = ""
 
-        // Open database window
+        // Open database window, then hide Connections window
         openWindow(value: profile.id)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            WindowCoordinator.shared.hideConnectionsWindow()
+        }
     }
 
     private func saveDraft(mode: EditorMode) {

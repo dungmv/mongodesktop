@@ -18,6 +18,14 @@ struct DatabaseBrowserView: View {
         .navigationTitle(appState.connectionName)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
+                // Button mở lại cửa sổ Connections
+                Button(action: {
+                    WindowCoordinator.shared.showConnectionsWindow()
+                }) {
+                    Image(systemName: "server.rack")
+                }
+                .help("Connections")
+
                 DatabasePickerButton()
                     .environmentObject(appState)
 
