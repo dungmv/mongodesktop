@@ -19,7 +19,6 @@ struct DatabaseBrowserView: View {
         .navigationTitle(appState.connectionName)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
-                // Button mở lại cửa sổ Connections
                 Button(action: {
                     WindowCoordinator.shared.showConnectionsWindow()
                 }) {
@@ -29,11 +28,6 @@ struct DatabaseBrowserView: View {
 
                 DatabasePickerButton()
                     .environmentObject(appState)
-
-                Button(action: { Task { await appState.refreshDatabases() } }) {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .help("Refresh databases")
             }
 
             ToolbarItemGroup(placement: .automatic) {
@@ -47,12 +41,7 @@ struct DatabaseBrowserView: View {
                 }
                 .help("Server Information")
                 .popover(isPresented: $showServerInfo, arrowEdge: .bottom) {
-                    if #available(macOS 14.0, *) {
-                        ServerInfoPopoverView()
-                            // No presentationBackground on older SDKs unless needed, but 14+ is fine
-                    } else {
-                        ServerInfoPopoverView()
-                    }
+                    ServerInfoPopoverView()
                 }
             }
         }
@@ -153,21 +142,31 @@ struct QueryStatusView: View {
                 }
             }
 
+            // Collection Name
+            if let col = appState.selectedCollection {
+                Divider().frame(height: 14)
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "tablecells")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(col)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                }
+            }
+
             if appState.isLoading || appState.lastQueryDuration != nil {
                 Divider().frame(height: 14)
             }
-
-            // Query Status
-            ZStack(alignment: .trailing) {
-                // Fixed placeholder width to prevent layout shift
-                HStack(spacing: 4) {
-                    Image(systemName: "clock").font(.caption)
-                    Text("0s").font(.system(.caption, design: .monospaced))
-                }
-                .opacity(0)
-                .accessibilityHidden(true)
-
-                // Query Duration
+            
+            if appState.isLoading {
+                ProgressView()
+                    .controlSize(.mini)
+                    .frame(width: 12, height: 12)
+                    .fixedSize()
+                    .opacity(appState.isLoading ? 1 : 0)
+            } else {
                 HStack(spacing: 4) {
                     Image(systemName: "clock")
                         .font(.caption)
@@ -176,19 +175,8 @@ struct QueryStatusView: View {
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
-                .opacity(appState.isLoading ? 0 : (appState.lastQueryDuration != nil ? 1 : 0))
-
-                // Loading Indicator
-                ProgressView()
-                    .controlSize(.mini)
-                    .frame(width: 12, height: 12)
-                    .fixedSize()
-                    .opacity(appState.isLoading ? 1 : 0)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: appState.isLoading)
-        .animation(.easeInOut(duration: 0.2), value: appState.lastQueryDuration)
-        .animation(.easeInOut(duration: 0.2), value: appState.selectedDatabase)
     }
 
     private func formattedDuration(_ seconds: TimeInterval) -> String {

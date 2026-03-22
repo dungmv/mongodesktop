@@ -20,16 +20,6 @@ struct DatabaseDetailView: View {
     // MARK: Toolbar Area
     private var toolbarArea: some View {
         VStack(spacing: 0) {
-            // Breadcrumb + View Mode
-            HStack(spacing: 12) {
-                breadcrumb
-                Spacer()
-                viewModePicker
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
-
             // Filter Row
             HStack(spacing: 8) {
                 Image(systemName: "line.3.horizontal.decrease.circle")
@@ -110,49 +100,18 @@ struct DatabaseDetailView: View {
         }
     }
 
-    // MARK: Breadcrumb
-    private var breadcrumb: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "cylinder.split.1x2")
-                .font(.caption)
-                .foregroundStyle(.secondary)
 
-            if let db = appState.selectedDatabase {
-                Text(db)
-                    .font(.system(.body, design: .rounded, weight: .medium))
-                    .foregroundStyle(.primary)
-
-                Image(systemName: "chevron.right")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-
-                if let col = appState.selectedCollection {
-                    Text(col)
-                        .font(.system(.body, design: .rounded, weight: .semibold))
-                        .foregroundStyle(.primary)
-                } else {
-                    Text("Chọn collection")
-                        .font(.body)
-                        .foregroundStyle(.tertiary)
-                }
-            } else {
-                Text("Chọn database")
-                    .font(.body)
-                    .foregroundStyle(.tertiary)
-            }
-        }
-    }
 
     // MARK: View Mode Picker
     private var viewModePicker: some View {
         Picker("", selection: $appState.viewMode) {
             ForEach(DocumentViewMode.allCases) { mode in
-                Label(mode.rawValue, systemImage: mode == .table ? "tablecells" : "curlybraces")
+                Image(systemName: mode == .table ? "tablecells" : "curlybraces")
                     .tag(mode)
             }
         }
         .pickerStyle(.segmented)
-        .frame(width: 160)
+        .frame(width: 70)
     }
 
     // MARK: Pagination
@@ -193,6 +152,8 @@ struct DatabaseDetailView: View {
             Text("Giới hạn \(appState.pageSize)")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+            
+            viewModePicker
         }
     }
 
