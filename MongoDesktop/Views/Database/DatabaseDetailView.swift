@@ -336,30 +336,31 @@ struct DocumentTableView: View {
         }
     }
 
-    private func displayValue(_ value: BSON?) -> String {
-        guard let value else { return "" }
-        switch value {
-        case .document(let doc):
-            return "{} \(doc.count) fields"
-        case .array(let arr):
-            return "[] \(arr.count) items"
-        case .string(let s):
-            return s
-        case .double(let d):
-            return String(d)
-        case .int32(let i):
-            return String(i)
-        case .int64(let i):
-            return String(i)
-        case .bool(let b):
-            return String(b)
-        case .null:
-            return "null"
-        case .datetime(let d):
-            return d.description
-        default:
-            return String(describing: value)
-        }
+}
+
+fileprivate func displayValue(_ value: BSON?) -> String {
+    guard let value else { return "" }
+    switch value {
+    case .document(let doc):
+        return "{} \(doc.count) fields"
+    case .array(let arr):
+        return "[] \(arr.count) items"
+    case .string(let s):
+        return s
+    case .double(let d):
+        return String(d)
+    case .int32(let i):
+        return String(i)
+    case .int64(let i):
+        return String(i)
+    case .bool(let b):
+        return String(b)
+    case .null:
+        return "null"
+    case .datetime(let d):
+        return d.description
+    default:
+        return String(describing: value)
     }
 }
 
@@ -447,9 +448,11 @@ struct JSONNode: Identifiable {
     let key: String?
     let value: String
     let children: [JSONNode]?
+    let rawValue: BSON
 
     init(key: String? = nil, value: BSON) {
         self.key = key
+        self.rawValue = value
         switch value {
         case .document(let doc):
             self.value = "{ \(doc.count) fields }"
@@ -460,7 +463,7 @@ struct JSONNode: Identifiable {
                 JSONNode(key: "[\(index)]", value: item)
             }
         default:
-            self.value = String(describing: value)
+            self.value = displayValue(value)
             self.children = nil
         }
     }
@@ -522,11 +525,12 @@ struct JSONNodeView: View {
 
     private var valueColor: Color {
         if node.children != nil { return .secondary }
-        let v = node.value
-        if v.hasPrefix("\"") { return Color(red: 0.8, green: 0.6, blue: 0.3) }
-        if v == "true" || v == "false" { return Color(red: 0.4, green: 0.85, blue: 0.5) }
-        if v == "null" { return Color(red: 0.7, green: 0.4, blue: 0.4) }
-        if Double(v) != nil { return Color(red: 0.6, green: 0.85, blue: 0.7) }
-        return .primary
+        switch node.rawValue {
+        case .string: return Color(red: 0.8, green: 0.6, blue: 0.3)
+        case .bool: return Color(red: 0.4, green: 0.85, blue: 0.5)
+        case .null: return Color(red: 0.7, green: 0.4, blue: 0.4)
+        case .int32, .int64, .double, .decimal128: return Color(red: 0.6, green: 0.85, blue: 0.7)
+        default: return .primary
+        }
     }
 }
