@@ -301,9 +301,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(inherited)",
-				);
+				HEADER_SEARCH_PATHS = "$(inherited)";
 				"HEADER_SEARCH_PATHS[arch=arm64]" = (
 					"/opt/homebrew/opt/mongo-c-driver/include/mongoc-2.2.3",
 					"/opt/homebrew/opt/mongo-c-driver/include/bson-2.2.3",
@@ -317,9 +315,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-				);
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "/opt/homebrew/opt/mongo-c-driver/lib";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "/usr/local/opt/mongo-c-driver/lib";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
@@ -356,9 +352,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(inherited)",
-				);
+				HEADER_SEARCH_PATHS = "$(inherited)";
 				"HEADER_SEARCH_PATHS[arch=arm64]" = (
 					"/opt/homebrew/opt/mongo-c-driver/include/mongoc-2.2.3",
 					"/opt/homebrew/opt/mongo-c-driver/include/bson-2.2.3",
@@ -372,9 +366,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-				);
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "/opt/homebrew/opt/mongo-c-driver/lib";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "/usr/local/opt/mongo-c-driver/lib";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;

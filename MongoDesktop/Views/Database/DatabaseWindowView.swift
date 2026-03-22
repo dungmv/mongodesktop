@@ -30,7 +30,7 @@ struct DatabaseWindowView: View {
                 WindowCoordinator.shared.showConnectionsWindow()
             }
         }
-        .frame(minWidth: 900, minHeight: 600)
+        .frame(minWidth: 900, idealWidth: 1000, minHeight: 600, idealHeight: 720)
     }
 
     private var connectingView: some View {

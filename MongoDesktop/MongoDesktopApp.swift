@@ -45,6 +45,7 @@ struct MongoDesktopApp: App {
             DatabaseWindowView(connectionId: connectionId)
                 .environmentObject(connectionStore)
         }
+        .defaultSize(width: 1000, height: 720)
         .restorationBehavior(.disabled)
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified(showsTitle: true))

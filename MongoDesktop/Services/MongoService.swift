@@ -140,6 +140,42 @@ actor MongoService {
         return "unknown"
     }
 
+    func getServerInfo() async throws -> ServerInfo {
+        let client = try requireClient()
+        
+        let helloReply = try? runCommand(client: client, database: "admin", command: ["hello": .int32(1)])
+        var clusterMode = "Standalone"
+        if let msg = helloReply?["msg"], case .string(let text) = msg, text == "isdbgrid" {
+            clusterMode = "Sharded Cluster"
+        } else if let setName = helloReply?["setName"], case .string(_) = setName {
+            clusterMode = "Replica Set"
+        }
+        
+        let version = (try? await serverVersion()) ?? "unknown"
+        
+        // Fetch databases list locally without async boundary inside a loop that calls actor, wait, we are inside the actor
+        // Wait, listDatabases() returns an array, and this method is in the actor, so we can just call it
+        let dbs = (try? await listDatabases()) ?? []
+        let databasesCount = dbs.count
+        
+        var collectionsCount = 0
+        for db in dbs {
+            if let cols = try? await listCollections(database: db) {
+                collectionsCount += cols.count
+            }
+        }
+        
+        let uri = connectedURI.map { redactedURI($0) } ?? "unknown"
+        
+        return ServerInfo(
+            databasesCount: databasesCount,
+            collectionsCount: collectionsCount,
+            clusterMode: clusterMode,
+            version: version,
+            hostURI: uri
+        )
+    }
+
     func findDocuments(
         database: String,
         collection: String,

@@ -5,6 +5,7 @@ import SwiftUI
 struct DatabaseBrowserView: View {
     @EnvironmentObject private var connectionStore: ConnectionStore
     @EnvironmentObject private var appState: AppState
+    @State private var showServerInfo = false
 
     var body: some View {
         NavigationSplitView {
@@ -35,9 +36,24 @@ struct DatabaseBrowserView: View {
                 .help("Refresh databases")
             }
 
-            ToolbarItemGroup(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .automatic) {
                 QueryStatusView()
                     .environmentObject(appState)
+            }
+
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button(action: { showServerInfo.toggle() }) {
+                    Image(systemName: "info.circle")
+                }
+                .help("Server Information")
+                .popover(isPresented: $showServerInfo, arrowEdge: .bottom) {
+                    if #available(macOS 14.0, *) {
+                        ServerInfoPopoverView()
+                            // No presentationBackground on older SDKs unless needed, but 14+ is fine
+                    } else {
+                        ServerInfoPopoverView()
+                    }
+                }
             }
         }
         .toolbarBackground(.visible, for: .windowToolbar)
@@ -113,20 +129,6 @@ struct QueryStatusView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Server Version
-            if !appState.serverVersion.isEmpty {
-                HStack(spacing: 4) {
-                    Image(systemName: "leaf.fill")
-                        .font(.caption)
-                        .foregroundStyle(.green.opacity(0.8))
-                    Text("mongo \(appState.serverVersion)")
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                }
-                
-                Divider().frame(height: 14)
-            }
-
             // Connection Name
             HStack(spacing: 6) {
                 Circle()
