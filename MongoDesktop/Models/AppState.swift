@@ -22,6 +22,12 @@ final class AppState: ObservableObject {
         statusMessage = "Đang kết nối..."
         connectionName = connection.name
         selectedConnectionId = connection.id
+        if !connection.database.isEmpty {
+            selectedDatabase = connection.database
+        } else {
+            selectedDatabase = nil
+        }
+        selectedCollection = nil
 
         Task {
             do {
@@ -73,6 +79,9 @@ final class AppState: ObservableObject {
             let list = try await MongoService.shared.listDatabases()
             await MainActor.run {
                 databases = list
+                if let selected = selectedDatabase, !list.contains(selected) {
+                    selectedDatabase = nil
+                }
                 if selectedDatabase == nil { selectedDatabase = list.first }
             }
         } catch {
