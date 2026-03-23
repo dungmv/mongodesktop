@@ -5,6 +5,7 @@ import SwiftBSON
 
 @MainActor
 final class QueryTabState: ObservableObject {
+    @Published var title: String = ""
     @Published var filterText: String = "{}"
     @Published var sortText: String = "{}"
     @Published var projectionText: String = "{}"
@@ -29,6 +30,7 @@ final class QueryTabState: ObservableObject {
 
     func runFind(database: String, collection: String, appState: AppState) async {
         await MainActor.run { isLoading = true; appState.lastError = nil; lastQueryDuration = nil }
+        await MainActor.run { title = collection }
         let start = Date()
         do {
             let filter = try parseFilter(filterText)

@@ -17,6 +17,11 @@ struct DatabaseBrowserView: View {
                 .environmentObject(appState)
                 .environmentObject(tabState)
         }
+        .onChange(of: appState.selectedCollection) { _, newValue in
+            if let newValue, !newValue.isEmpty {
+                tabState.title = newValue
+            }
+        }
         .navigationSplitViewStyle(.balanced)
         .navigationTitle(appState.connectionName)
         .toolbar {

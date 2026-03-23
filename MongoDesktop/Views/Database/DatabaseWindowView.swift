@@ -67,6 +67,11 @@ struct DatabaseWindowView: View {
 
     private func addTab() {
         let state = QueryTabState()
+        if let col = appState.selectedCollection, !col.isEmpty {
+            state.title = col
+        } else if let db = appState.selectedDatabase, !db.isEmpty {
+            state.title = db
+        }
         let tab = DatabaseTab(id: UUID(), state: state)
         tabs.append(tab)
         selectedTabId = tab.id
@@ -97,7 +102,7 @@ struct DatabaseWindowView: View {
 
     private var tabContext: DatabaseTabContext {
         let items = tabs.enumerated().map { index, tab in
-            DatabaseTabItem(id: tab.id, title: tabTitle(fallbackIndex: index + 1))
+            DatabaseTabItem(id: tab.id, title: tabTitle(for: tab.state, fallbackIndex: index + 1))
         }
         return DatabaseTabContext(
             tabs: items,
@@ -113,7 +118,10 @@ struct DatabaseWindowView: View {
         )
     }
 
-    private func tabTitle(fallbackIndex: Int) -> String {
+    private func tabTitle(for state: QueryTabState, fallbackIndex: Int) -> String {
+        if !state.title.isEmpty { return state.title }
+        if let col = appState.selectedCollection, !col.isEmpty { return col }
+        if let db = appState.selectedDatabase, !db.isEmpty { return db }
         return "Tab \(fallbackIndex)"
     }
 
