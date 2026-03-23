@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // MARK: - DatabaseBrowserView
 
@@ -6,6 +7,8 @@ struct DatabaseBrowserView: View {
     @EnvironmentObject private var connectionStore: ConnectionStore
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var tabState: QueryTabState
+    @Environment(\.addDatabaseTab) private var addDatabaseTab
+    @State private var showServerInfo = false
 
     var body: some View {
         NavigationSplitView {
@@ -35,11 +38,25 @@ struct DatabaseBrowserView: View {
 
                 DatabasePickerButton()
                     .environmentObject(appState)
+
+                DatabaseCollectionInlineView()
+                    .environmentObject(appState)
             }
 
-            ToolbarItemGroup(placement: .principal) {
-                QueryStatusView()
+            ToolbarItem(placement: .principal) {
+                ConnectionStatusCenterView(showServerInfo: $showServerInfo)
                     .environmentObject(appState)
+                    .environmentObject(tabState)
+            }
+
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button(action: addDatabaseTab) {
+                    Image(systemName: "plus")
+                        .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("New Tab")
             }
         }
         .toolbarBackground(.visible, for: .windowToolbar)
@@ -108,16 +125,108 @@ struct CollectionSidebarView: View {
     }
 }
 
-// MARK: - QueryStatusView
+// MARK: - DatabaseCollectionInlineView
 
-struct QueryStatusView: View {
+struct DatabaseCollectionInlineView: View {
+    @EnvironmentObject private var appState: AppState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if let db = appState.selectedDatabase, !db.isEmpty {
+                Text(db)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+            }
+
+            if let col = appState.selectedCollection, !col.isEmpty {
+                Text(col)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+}
+
+// MARK: - Titlebar Leading Content
+
+struct TitlebarLeadingContent: View {
+    @EnvironmentObject private var appState: AppState
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Button(action: {
+                WindowCoordinator.shared.showConnectionsWindow()
+            }) {
+                Image(systemName: "server.rack")
+            }
+            .help("Connections")
+
+            DatabasePickerButton()
+                .environmentObject(appState)
+
+            DatabaseCollectionInlineView()
+                .environmentObject(appState)
+        }
+        .padding(.leading, 6)
+    }
+}
+
+// MARK: - Titlebar Leading Accessory Host
+
+struct TitlebarLeadingAccessoryHost<Content: View>: NSViewRepresentable {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        NSView(frame: .zero)
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if context.coordinator.hostingView == nil {
+            context.coordinator.hostingView = NSHostingView(rootView: content)
+        } else {
+            context.coordinator.hostingView?.rootView = content
+        }
+
+        guard let window = nsView.window,
+              let hostingView = context.coordinator.hostingView
+        else { return }
+
+        if context.coordinator.controller == nil {
+            let controller = NSTitlebarAccessoryViewController()
+            controller.view = hostingView
+            controller.layoutAttribute = .leading
+            window.addTitlebarAccessoryViewController(controller)
+            context.coordinator.controller = controller
+        } else if context.coordinator.controller?.view !== hostingView {
+            context.coordinator.controller?.view = hostingView
+        }
+    }
+
+    final class Coordinator {
+        var controller: NSTitlebarAccessoryViewController?
+        var hostingView: NSHostingView<Content>?
+    }
+}
+
+// MARK: - ConnectionStatusCenterView
+
+struct ConnectionStatusCenterView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var tabState: QueryTabState
-    @State private var showServerInfo = false
+    @Binding var showServerInfo: Bool
 
     var body: some View {
         HStack(spacing: 12) {
-            // Connection Name
             HStack(spacing: 6) {
                 Button(action: { showServerInfo.toggle() }) {
                     Image(systemName: "info.circle")
@@ -127,43 +236,16 @@ struct QueryStatusView: View {
                 .popover(isPresented: $showServerInfo, arrowEdge: .bottom) {
                     ServerInfoPopoverView()
                 }
+
                 Text(appState.connectionName)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.primary)
             }
 
-            // Database Name
-            if let db = appState.selectedDatabase {
-                Divider().frame(height: 14)
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "cylinder.split.1x2")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(db)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                }
-            }
-
-            // Collection Name
-            if let col = appState.selectedCollection {
-                Divider().frame(height: 14)
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "tablecells")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(col)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                }
-            }
-
             if tabState.isLoading || tabState.lastQueryDuration != nil {
                 Divider().frame(height: 14)
             }
-            
+
             if tabState.isLoading {
                 ProgressView()
                     .controlSize(.mini)

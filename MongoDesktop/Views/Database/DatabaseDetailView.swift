@@ -63,15 +63,6 @@ struct DatabaseDetailView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
 
-                if let tabContext, tabContext.tabs.count == 1 {
-                    Button(action: tabContext.add) {
-                        Image(systemName: "plus")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .help("New Tab")
-                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
