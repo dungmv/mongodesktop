@@ -5,7 +5,7 @@ import SwiftUI
 struct DatabaseBrowserView: View {
     @EnvironmentObject private var connectionStore: ConnectionStore
     @EnvironmentObject private var appState: AppState
-    @State private var showServerInfo = false
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         NavigationSplitView {
@@ -30,19 +30,17 @@ struct DatabaseBrowserView: View {
                     .environmentObject(appState)
             }
 
-            ToolbarItemGroup(placement: .automatic) {
+            ToolbarItemGroup(placement: .principal) {
                 QueryStatusView()
                     .environmentObject(appState)
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
-                Button(action: { showServerInfo.toggle() }) {
-                    Image(systemName: "info.circle")
+                Button(action: openNewTab) {
+                    Image(systemName: "plus.square.on.square")
                 }
-                .help("Server Information")
-                .popover(isPresented: $showServerInfo, arrowEdge: .bottom) {
-                    ServerInfoPopoverView()
-                }
+                .help("New Tab")
+                .disabled(appState.selectedConnectionId == nil)
             }
         }
         .toolbarBackground(.visible, for: .windowToolbar)
@@ -115,14 +113,20 @@ struct CollectionSidebarView: View {
 
 struct QueryStatusView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var showServerInfo = false
 
     var body: some View {
         HStack(spacing: 12) {
             // Connection Name
             HStack(spacing: 6) {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 7, height: 7)
+                Button(action: { showServerInfo.toggle() }) {
+                    Image(systemName: "info.circle")
+                }
+                .buttonStyle(.plain)
+                .help("Server Information")
+                .popover(isPresented: $showServerInfo, arrowEdge: .bottom) {
+                    ServerInfoPopoverView()
+                }
                 Text(appState.connectionName)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.primary)
@@ -185,6 +189,13 @@ struct QueryStatusView: View {
         } else {
             return String(format: "%.2fs", seconds)
         }
+    }
+}
+
+private extension DatabaseBrowserView {
+    func openNewTab() {
+        guard let id = appState.selectedConnectionId else { return }
+        openWindow(value: id)
     }
 }
 
