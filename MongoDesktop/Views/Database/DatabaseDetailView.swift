@@ -5,9 +5,16 @@ import SwiftBSON
 
 struct DatabaseDetailView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var tabState: QueryTabState
+    @Environment(\.databaseTabContext) private var tabContext
 
     var body: some View {
         VStack(spacing: 0) {
+            if let tabContext {
+                if tabContext.tabs.count > 1 {
+                    tabBar(tabContext)
+                }
+            }
             toolbarArea
             Divider()
                 .opacity(0.4)
@@ -26,13 +33,13 @@ struct DatabaseDetailView: View {
                     .foregroundStyle(.secondary)
                     .font(.body)
 
-                TextField("Filter JSON  { \"field\": \"value\" }", text: $appState.filterText)
+                TextField("Filter JSON  { \"field\": \"value\" }", text: $tabState.filterText)
                     .textFieldStyle(.plain)
                     .font(.system(.body, design: .monospaced))
                     .frame(maxWidth: .infinity)
 
-                Button(action: { withAnimation(.easeInOut(duration: 0.2)) { appState.isAdvancedQuery.toggle() } }) {
-                    Label(appState.isAdvancedQuery ? "Simple" : "Advanced", systemImage: "slider.horizontal.3")
+                Button(action: { withAnimation(.easeInOut(duration: 0.2)) { tabState.isAdvancedQuery.toggle() } }) {
+                    Label(tabState.isAdvancedQuery ? "Simple" : "Advanced", systemImage: "slider.horizontal.3")
                         .font(.caption.weight(.medium))
                 }
                 .buttonStyle(.bordered)
@@ -55,12 +62,22 @@ struct DatabaseDetailView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+
+                if let tabContext, tabContext.tabs.count == 1 {
+                    Button(action: tabContext.add) {
+                        Image(systemName: "plus")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("New Tab")
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .background(.ultraThinMaterial)
 
-            if appState.isAdvancedQuery {
+            if tabState.isAdvancedQuery {
                 advancedQueryRow
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -84,7 +101,7 @@ struct DatabaseDetailView: View {
                 .foregroundStyle(.secondary)
                 .font(.caption)
 
-            TextField("Sort JSON  { \"field\": 1 }", text: $appState.sortText)
+            TextField("Sort JSON  { \"field\": 1 }", text: $tabState.sortText)
                 .textFieldStyle(.plain)
                 .font(.system(.callout, design: .monospaced))
                 .frame(maxWidth: .infinity)
@@ -93,7 +110,7 @@ struct DatabaseDetailView: View {
                 .frame(height: 16)
                 .opacity(0.5)
 
-            TextField("Projection JSON  { \"field\": 1 }", text: $appState.projectionText)
+            TextField("Projection JSON  { \"field\": 1 }", text: $tabState.projectionText)
                 .textFieldStyle(.plain)
                 .font(.system(.callout, design: .monospaced))
                 .frame(maxWidth: .infinity)
@@ -104,7 +121,7 @@ struct DatabaseDetailView: View {
 
     // MARK: View Mode Picker
     private var viewModePicker: some View {
-        Picker("", selection: $appState.viewMode) {
+        Picker("", selection: $tabState.viewMode) {
             ForEach(DocumentViewMode.allCases) { mode in
                 Image(systemName: mode == .table ? "tablecells" : "curlybraces")
                     .tag(mode)
@@ -117,39 +134,39 @@ struct DatabaseDetailView: View {
     // MARK: Pagination
     private var paginationRow: some View {
         HStack(spacing: 12) {
-            Button(action: { Task { await appState.previousPage() } }) {
+            Button(action: { Task { await tabState.previousPage(appState: appState) } }) {
                 Image(systemName: "chevron.left")
                     .font(.caption.weight(.semibold))
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            .disabled(appState.currentPage == 0)
+            .disabled(tabState.currentPage == 0)
 
-            Text("Trang \(appState.currentPage + 1)")
+            Text("Trang \(tabState.currentPage + 1)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
 
-            Button(action: { Task { await appState.nextPage() } }) {
+            Button(action: { Task { await tabState.nextPage(appState: appState) } }) {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            .disabled(!appState.hasMore)
+            .disabled(!tabState.hasMore)
 
             Divider()
                 .frame(height: 14)
                 .padding(.horizontal, 4)
 
-            Text("\(appState.documents.count) docs")
+            Text("\(tabState.documents.count) docs")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
 
             Spacer()
 
-            Text("Giới hạn \(appState.pageSize)")
+            Text("Giới hạn \(tabState.pageSize)")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             
@@ -170,25 +187,95 @@ struct DatabaseDetailView: View {
                     .padding(.top, 40)
                     Spacer()
                 }
-            } else if appState.viewMode == .table {
-                DocumentTableView(documents: appState.documents, selection: $appState.selectedRowIds)
+            } else if tabState.viewMode == .table {
+                DocumentTableView(documents: tabState.documents, selection: $tabState.selectedRowIds)
             } else {
-                DocumentJSONView(documents: appState.documents)
+                DocumentJSONView(documents: tabState.documents)
             }
         }
     }
 
     // MARK: Actions
     private func runFind() {
-        guard let db = appState.selectedDatabase,
-              let collection = appState.selectedCollection else { return }
-        appState.currentPage = 0
-        Task { await appState.runFind(database: db, collection: collection) }
+        tabState.resetPaging()
+        Task { await tabState.runFind(appState: appState) }
     }
 
     private func refresh() {
         guard let db = appState.selectedDatabase else { return }
-        Task { await appState.refreshCollections(database: db) }
+        Task {
+            await appState.refreshCollections(database: db)
+            tabState.resetPaging()
+            await tabState.runFind(appState: appState)
+        }
+    }
+
+    private func tabBar(_ context: DatabaseTabContext) -> some View {
+        ScrollView(.horizontal, showsIndicators: true) {
+            HStack(spacing: 8) {
+                ForEach(context.tabs) { tab in
+                    TabPill(
+                        title: tab.title,
+                        isSelected: tab.id == context.selectedId,
+                        onSelect: { context.select(tab.id) },
+                        onClose: { context.close(tab.id) }
+                    )
+                }
+                Button(action: context.add) {
+                    Image(systemName: "plus")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(Color.secondary.opacity(0.12)))
+                }
+                .buttonStyle(.plain)
+                .help("New Tab")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .bottom) {
+            Divider().opacity(0.3)
+        }
+    }
+}
+
+private struct TabPill: View {
+    let title: String
+    let isSelected: Bool
+    let onSelect: () -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button(action: onSelect) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .lineLimit(1)
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 14, height: 14)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule(style: .continuous)
+                .fill(isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(Color.primary.opacity(isSelected ? 0.22 : 0.12), lineWidth: 1)
+        )
     }
 }
 

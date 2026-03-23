@@ -5,15 +5,17 @@ import SwiftUI
 struct DatabaseBrowserView: View {
     @EnvironmentObject private var connectionStore: ConnectionStore
     @EnvironmentObject private var appState: AppState
-    @Environment(\.openWindow) private var openWindow
+    @EnvironmentObject private var tabState: QueryTabState
 
     var body: some View {
         NavigationSplitView {
             CollectionSidebarView()
                 .environmentObject(appState)
+                .environmentObject(tabState)
         } detail: {
             DatabaseDetailView()
                 .environmentObject(appState)
+                .environmentObject(tabState)
         }
         .navigationSplitViewStyle(.balanced)
         .navigationTitle(appState.connectionName)
@@ -34,14 +36,6 @@ struct DatabaseBrowserView: View {
                 QueryStatusView()
                     .environmentObject(appState)
             }
-
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button(action: openNewTab) {
-                    Image(systemName: "plus.square.on.square")
-                }
-                .help("New Tab")
-                .disabled(appState.selectedConnectionId == nil)
-            }
         }
         .toolbarBackground(.visible, for: .windowToolbar)
         .toolbarBackground(.ultraThinMaterial, for: .windowToolbar)
@@ -60,6 +54,7 @@ struct DatabaseBrowserView: View {
 
 struct CollectionSidebarView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var tabState: QueryTabState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -98,10 +93,9 @@ struct CollectionSidebarView: View {
                 }
                 .listStyle(.sidebar)
                 .scrollContentBackground(.hidden)
-                .onChange(of: appState.selectedCollection) { _, newValue in
-                    guard let newValue, let db = appState.selectedDatabase else { return }
-                    appState.currentPage = 0
-                    Task { await appState.runFind(database: db, collection: newValue) }
+                .onChange(of: appState.selectedCollection) { _, _ in
+                    tabState.resetPaging()
+                    Task { await tabState.runFind(appState: appState) }
                 }
             }
         }
@@ -113,6 +107,7 @@ struct CollectionSidebarView: View {
 
 struct QueryStatusView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var tabState: QueryTabState
     @State private var showServerInfo = false
 
     var body: some View {
@@ -160,22 +155,22 @@ struct QueryStatusView: View {
                 }
             }
 
-            if appState.isLoading || appState.lastQueryDuration != nil {
+            if tabState.isLoading || tabState.lastQueryDuration != nil {
                 Divider().frame(height: 14)
             }
             
-            if appState.isLoading {
+            if tabState.isLoading {
                 ProgressView()
                     .controlSize(.mini)
                     .frame(width: 12, height: 12)
                     .fixedSize()
-                    .opacity(appState.isLoading ? 1 : 0)
+                    .opacity(tabState.isLoading ? 1 : 0)
             } else {
                 HStack(spacing: 4) {
                     Image(systemName: "clock")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(appState.lastQueryDuration.map { formattedDuration($0) } ?? "0ms")
+                    Text(tabState.lastQueryDuration.map { formattedDuration($0) } ?? "0ms")
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
@@ -189,13 +184,6 @@ struct QueryStatusView: View {
         } else {
             return String(format: "%.2fs", seconds)
         }
-    }
-}
-
-private extension DatabaseBrowserView {
-    func openNewTab() {
-        guard let id = appState.selectedConnectionId else { return }
-        openWindow(value: id)
     }
 }
 
