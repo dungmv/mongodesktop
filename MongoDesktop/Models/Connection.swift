@@ -1,38 +1,34 @@
-//
-//  Connection.swift
-//  mongoui
-//
-//  Created by Trae AI on 21/4/25.
-//
-
 import Foundation
-import SwiftData
 
-@Model
-final class Connection {
+struct ConnectionProfile: Identifiable, Codable, Hashable {
+    var id: UUID
     var name: String
     var host: String
     var port: Int
-    var username: String?
-    var password: String?
-    var database: String?
-    var authDatabase: String?
+    var username: String
+    var password: String
+    var database: String
+    var authDatabase: String
     var useSRV: Bool
     var useSSL: Bool
     var createdAt: Date
     var lastConnectedAt: Date?
-    
+
     init(
+        id: UUID = UUID(),
         name: String,
         host: String,
         port: Int = 27017,
-        username: String? = nil,
-        password: String? = nil,
-        database: String? = nil,
-        authDatabase: String? = nil,
+        username: String = "",
+        password: String = "",
+        database: String = "",
+        authDatabase: String = "",
         useSRV: Bool = false,
-        useSSL: Bool = false
+        useSSL: Bool = false,
+        createdAt: Date = Date(),
+        lastConnectedAt: Date? = nil
     ) {
+        self.id = id
         self.name = name
         self.host = host
         self.port = port
@@ -42,52 +38,109 @@ final class Connection {
         self.authDatabase = authDatabase
         self.useSRV = useSRV
         self.useSSL = useSSL
-        self.createdAt = Date()
+        self.createdAt = createdAt
+        self.lastConnectedAt = lastConnectedAt
     }
-    
+
     var connectionString: String {
-        var uri = "mongodb"
-        
-        if useSRV {
-            uri += "+srv"
-        }
-        
-        uri += "://"
-        
-        if let username = username, !username.isEmpty {
-            uri += username
-            
-            if let password = password, !password.isEmpty {
-                uri += ":(password)"
+        let scheme = useSRV ? "mongodb+srv" : "mongodb"
+        var uri = "\(scheme)://"
+
+        if !username.isEmpty {
+            let user = ConnectionProfile.percentEncode(username)
+            uri += user
+            if !password.isEmpty {
+                let pass = ConnectionProfile.percentEncode(password)
+                uri += ":\(pass)"
             }
-            
             uri += "@"
         }
-        
+
         uri += host
-        
+
         if !useSRV && port != 27017 {
-            uri += ":(port)"
+            uri += ":\(port)"
         }
-        
-        if let database = database, !database.isEmpty {
-            uri += "/(database)"
+
+        if !database.isEmpty {
+            uri += "/\(database)"
         }
-        
-        var queryParams: [String] = []
-        
-        if let authDatabase = authDatabase, !authDatabase.isEmpty {
-            queryParams.append("authSource=(authDatabase)")
+
+        var queryItems: [String] = []
+
+        if !authDatabase.isEmpty {
+            queryItems.append("authSource=\(authDatabase)")
         }
-        
+
         if useSSL {
-            queryParams.append("ssl=true")
+            queryItems.append("tls=true")
         }
-        
-        if !queryParams.isEmpty {
-            uri += "?(queryParams.joined(separator: \"&\"))"
+
+        if !queryItems.isEmpty {
+            uri += "?" + queryItems.joined(separator: "&")
         }
-        
+
         return uri
+    }
+
+    private static func percentEncode(_ value: String) -> String {
+        let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+    }
+}
+
+@MainActor
+final class ConnectionStore: ObservableObject {
+    @Published private(set) var connections: [ConnectionProfile] = []
+
+    private let fileURL: URL
+
+    init() {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let folder = appSupport.appendingPathComponent("MongoDesktop", isDirectory: true)
+        self.fileURL = folder.appendingPathComponent("connections.json")
+        load()
+    }
+
+    func load() {
+        do {
+            let data = try Data(contentsOf: fileURL)
+            connections = try JSONDecoder().decode([ConnectionProfile].self, from: data)
+        } catch {
+            connections = []
+        }
+    }
+
+    func add(_ connection: ConnectionProfile) {
+        connections.append(connection)
+        save()
+    }
+
+    func update(_ connection: ConnectionProfile) {
+        guard let index = connections.firstIndex(where: { $0.id == connection.id }) else { return }
+        connections[index] = connection
+        save()
+    }
+
+    func delete(_ connection: ConnectionProfile) {
+        connections.removeAll { $0.id == connection.id }
+        save()
+    }
+
+    func markConnected(_ connectionId: UUID) {
+        guard let index = connections.firstIndex(where: { $0.id == connectionId }) else { return }
+        connections[index].lastConnectedAt = Date()
+        save()
+    }
+
+    private func save() {
+        do {
+            let folder = fileURL.deletingLastPathComponent()
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let data = try JSONEncoder().encode(connections)
+            try data.write(to: fileURL, options: [.atomic])
+        } catch {
+            // Silent fail for MVP; connection editing will show in-memory changes.
+        }
     }
 }

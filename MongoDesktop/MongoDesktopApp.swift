@@ -1,32 +1,53 @@
-//
-//  MongoDesktopApp.swift
-//  MongoDesktop
-//
-//  Created by Mai Dũng on 29/4/25.
-//
-
 import SwiftUI
-import SwiftData
+
+// MARK: - WindowCoordinator
+
+/// Quản lý singleton cửa sổ ConnectionsListView (ẩn/hiện).
+@MainActor
+final class WindowCoordinator: ObservableObject {
+    static let shared = WindowCoordinator()
+    private init() {}
+
+    /// Ẩn cửa sổ Connections (khi vừa connect)
+    func hideConnectionsWindow() {
+        connectionsWindow?.orderOut(nil)
+    }
+
+    /// Hiện lại cửa sổ Connections (khi database window đóng)
+    func showConnectionsWindow() {
+        if let win = connectionsWindow {
+            win.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
+    private var connectionsWindow: NSWindow? {
+        NSApp.windows.first { $0.title == "Connections" }
+    }
+}
+
+// MARK: - App
 
 @main
 struct MongoDesktopApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Connection.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    @StateObject private var connectionStore = ConnectionStore()
 
     var body: some Scene {
-        WindowGroup {
-            ConnectionsView()
+        // Main window: Connections list (singleton)
+        WindowGroup("Connections") {
+            ConnectionsListView()
+                .environmentObject(connectionStore)
         }
-        .modelContainer(sharedModelContainer)
+        .defaultSize(width: 720, height: 500)
+
+        // Database windows: one per connection (opened via openWindow(value:))
+        WindowGroup("Database", for: ConnectionProfile.ID.self) { $connectionId in
+            DatabaseWindowView(connectionId: connectionId)
+                .environmentObject(connectionStore)
+        }
+        .defaultSize(width: 1000, height: 720)
+        .restorationBehavior(.disabled)
+        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified(showsTitle: true))
     }
 }

@@ -7,8 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		5C3182DD2DBFF0D8004C59B0 /* MongoSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 5C3182DC2DBFF0D8004C59B0 /* MongoSwift */; };
-		5C3182DF2DBFF0D8004C59B0 /* MongoSwiftSync in Frameworks */ = {isa = PBXBuildFile; productRef = 5C3182DE2DBFF0D8004C59B0 /* MongoSwiftSync */; };
+		5C3182DD2DBFF0D8004C59B0 /* SwiftBSON in Frameworks */ = {isa = PBXBuildFile; productRef = 5C3182DC2DBFF0D8004C59B0 /* SwiftBSON */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,8 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5C3182DF2DBFF0D8004C59B0 /* MongoSwiftSync in Frameworks */,
-				5C3182DD2DBFF0D8004C59B0 /* MongoSwift in Frameworks */,
+				5C3182DD2DBFF0D8004C59B0 /* SwiftBSON in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -62,6 +60,7 @@
 				5C3182C62DBFF006004C59B0 /* Sources */,
 				5C3182C72DBFF006004C59B0 /* Frameworks */,
 				5C3182C82DBFF006004C59B0 /* Resources */,
+				5C7E9A3E2F1A123400ABCDEF /* Embed Mongo C Driver */,
 			);
 			buildRules = (
 			);
@@ -72,8 +71,7 @@
 			);
 			name = MongoDesktop;
 			packageProductDependencies = (
-				5C3182DC2DBFF0D8004C59B0 /* MongoSwift */,
-				5C3182DE2DBFF0D8004C59B0 /* MongoSwiftSync */,
+				5C3182DC2DBFF0D8004C59B0 /* SwiftBSON */,
 			);
 			productName = MongoDesktop;
 			productReference = 5C3182CA2DBFF006004C59B0 /* MongoDesktop.app */;
@@ -87,7 +85,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1630;
-				LastUpgradeCheck = 1630;
+				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					5C3182C92DBFF006004C59B0 = {
 						CreatedOnToolsVersion = 16.3;
@@ -104,7 +102,7 @@
 			mainGroup = 5C3182C12DBFF006004C59B0;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "mongo-swift-driver" */,
+				5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "swift-bson" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5C3182CB2DBFF006004C59B0 /* Products */;
@@ -125,6 +123,30 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		5C7E9A3E2F1A123400ABCDEF /* Embed Mongo C Driver */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Mongo C Driver";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libmongoc2.2.dylib",
+				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libbson2.2.dylib",
+				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/libzstd.1.dylib",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\nMONGO_PREFIX=\"/opt/homebrew/opt/mongo-c-driver\"\nif [ -d \"/usr/local/opt/mongo-c-driver\" ]; then\n  MONGO_PREFIX=\"/usr/local/opt/mongo-c-driver\"\nfi\n\nZSTD_PREFIX=\"/opt/homebrew/opt/zstd\"\nif [ -d \"/usr/local/opt/zstd\" ]; then\n  ZSTD_PREFIX=\"/usr/local/opt/zstd\"\nfi\n\nLIB_DIR=\"$MONGO_PREFIX/lib\"\nZSTD_LIB_DIR=\"$ZSTD_PREFIX/lib\"\nFRAMEWORKS_DIR=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\nMACOS_DIR=\"${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/Contents/MacOS\"\n\nmkdir -p \"$FRAMEWORKS_DIR\"\n\ncopy_lib_from() {\n  local name=\"$1\"\n  local dir=\"$2\"\n  local destination=\"$FRAMEWORKS_DIR/$name\"\n  if [ -f \"$dir/$name\" ]; then\n    /bin/cp -f \"$dir/$name\" \"$destination\"\n    /usr/bin/codesign --remove-signature \"$destination\" >/dev/null 2>&1 || true\n  else\n    echo \"warning: $name not found at $dir\"\n  fi\n}\n\ncopy_lib_from libmongoc2.2.dylib \"$LIB_DIR\"\ncopy_lib_from libbson2.2.dylib \"$LIB_DIR\"\ncopy_lib_from libzstd.1.dylib \"$ZSTD_LIB_DIR\"\n\nif [ -f \"$FRAMEWORKS_DIR/libmongoc2.2.dylib\" ]; then\n  /usr/bin/install_name_tool -id \"@rpath/libmongoc2.2.dylib\" \"$FRAMEWORKS_DIR/libmongoc2.2.dylib\" || true\n  /usr/bin/install_name_tool -change \"/opt/homebrew/opt/mongo-c-driver/lib/libbson2.2.dylib\" \"@rpath/libbson2.2.dylib\" \"$FRAMEWORKS_DIR/libmongoc2.2.dylib\" || true\n  /usr/bin/install_name_tool -change \"/usr/local/opt/mongo-c-driver/lib/libbson2.2.dylib\" \"@rpath/libbson2.2.dylib\" \"$FRAMEWORKS_DIR/libmongoc2.2.dylib\" || true\n  /usr/bin/install_name_tool -change \"/opt/homebrew/opt/zstd/lib/libzstd.1.dylib\" \"@rpath/libzstd.1.dylib\" \"$FRAMEWORKS_DIR/libmongoc2.2.dylib\" || true\n  /usr/bin/install_name_tool -change \"/usr/local/opt/zstd/lib/libzstd.1.dylib\" \"@rpath/libzstd.1.dylib\" \"$FRAMEWORKS_DIR/libmongoc2.2.dylib\" || true\nfi\n\nif [ -f \"$FRAMEWORKS_DIR/libbson2.2.dylib\" ]; then\n  /usr/bin/install_name_tool -id \"@rpath/libbson2.2.dylib\" \"$FRAMEWORKS_DIR/libbson2.2.dylib\" || true\nfi\n\nif [ -f \"$FRAMEWORKS_DIR/libzstd.1.dylib\" ]; then\n  /usr/bin/install_name_tool -id \"@rpath/libzstd.1.dylib\" \"$FRAMEWORKS_DIR/libzstd.1.dylib\" || true\nfi\n\nfix_binary_if_needed() {\n  local bin=\"$1\"\n  if [ -f \"$bin\" ]; then\n    if /usr/bin/otool -L \"$bin\" | /usr/bin/grep -q \"/opt/homebrew/opt/mongo-c-driver\\|/usr/local/opt/mongo-c-driver\\|/opt/homebrew/opt/zstd\\|/usr/local/opt/zstd\"; then\n      /usr/bin/codesign --remove-signature \"$bin\" >/dev/null 2>&1 || true\n      /usr/bin/install_name_tool -change \"/opt/homebrew/opt/mongo-c-driver/lib/libmongoc2.2.dylib\" \"@rpath/libmongoc2.2.dylib\" \"$bin\" || true\n      /usr/bin/install_name_tool -change \"/usr/local/opt/mongo-c-driver/lib/libmongoc2.2.dylib\" \"@rpath/libmongoc2.2.dylib\" \"$bin\" || true\n      /usr/bin/install_name_tool -change \"/opt/homebrew/opt/mongo-c-driver/lib/libbson2.2.dylib\" \"@rpath/libbson2.2.dylib\" \"$bin\" || true\n      /usr/bin/install_name_tool -change \"/usr/local/opt/mongo-c-driver/lib/libbson2.2.dylib\" \"@rpath/libbson2.2.dylib\" \"$bin\" || true\n      /usr/bin/install_name_tool -change \"/opt/homebrew/opt/zstd/lib/libzstd.1.dylib\" \"@rpath/libzstd.1.dylib\" \"$bin\" || true\n      /usr/bin/install_name_tool -change \"/usr/local/opt/zstd/lib/libzstd.1.dylib\" \"@rpath/libzstd.1.dylib\" \"$bin\" || true\n    fi\n  fi\n}\n\nfix_binary_if_needed \"${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}\"\nfix_binary_if_needed \"${MACOS_DIR}/${PRODUCT_NAME}.debug.dylib\"\nfix_binary_if_needed \"${MACOS_DIR}/__preview.dylib\"\n\nfor dylib in \"$MACOS_DIR\"/*.dylib; do\n  fix_binary_if_needed \"$dylib\"\ndone\n\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]; then\n  for f in \"$FRAMEWORKS_DIR\"/*.dylib; do\n    if [ -f \"$f\" ]; then\n      /usr/bin/codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp=none \"$f\" || true\n    fi\n  done\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		5C3182C62DBFF006004C59B0 /* Sources */ = {
@@ -171,6 +193,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = A5367HLPFW;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -191,11 +214,12 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.4;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -235,6 +259,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = A5367HLPFW;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -249,10 +274,11 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.4;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -266,21 +292,44 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = A5367HLPFW;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "$(inherited)";
+				"HEADER_SEARCH_PATHS[arch=arm64]" = (
+					"/opt/homebrew/opt/mongo-c-driver/include/mongoc-2.2.3",
+					"/opt/homebrew/opt/mongo-c-driver/include/bson-2.2.3",
+				);
+				"HEADER_SEARCH_PATHS[arch=x86_64]" = (
+					"/usr/local/opt/mongo-c-driver/include/mongoc-2.2.3",
+					"/usr/local/opt/mongo-c-driver/include/bson-2.2.3",
+				);
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "/opt/homebrew/opt/mongo-c-driver/lib";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "/usr/local/opt/mongo-c-driver/lib";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lmongoc2",
+					"-lbson2",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.dungmv.mongodesktop.MongoDesktop;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "MongoDesktop/MongoC-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -294,21 +343,44 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = A5367HLPFW;
+				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "$(inherited)";
+				"HEADER_SEARCH_PATHS[arch=arm64]" = (
+					"/opt/homebrew/opt/mongo-c-driver/include/mongoc-2.2.3",
+					"/opt/homebrew/opt/mongo-c-driver/include/bson-2.2.3",
+				);
+				"HEADER_SEARCH_PATHS[arch=x86_64]" = (
+					"/usr/local/opt/mongo-c-driver/include/mongoc-2.2.3",
+					"/usr/local/opt/mongo-c-driver/include/bson-2.2.3",
+				);
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				LIBRARY_SEARCH_PATHS = "$(inherited)";
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "/opt/homebrew/opt/mongo-c-driver/lib";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "/usr/local/opt/mongo-c-driver/lib";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lmongoc2",
+					"-lbson2",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.dungmv.mongodesktop.MongoDesktop;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "MongoDesktop/MongoC-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
@@ -337,26 +409,21 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "mongo-swift-driver" */ = {
+		5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "swift-bson" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/mongodb/mongo-swift-driver";
+			repositoryURL = "https://github.com/mongodb/swift-bson";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.3.1;
+				minimumVersion = 3.1.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		5C3182DC2DBFF0D8004C59B0 /* MongoSwift */ = {
+		5C3182DC2DBFF0D8004C59B0 /* SwiftBSON */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "mongo-swift-driver" */;
-			productName = MongoSwift;
-		};
-		5C3182DE2DBFF0D8004C59B0 /* MongoSwiftSync */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "mongo-swift-driver" */;
-			productName = MongoSwiftSync;
+			package = 5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "swift-bson" */;
+			productName = SwiftBSON;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
