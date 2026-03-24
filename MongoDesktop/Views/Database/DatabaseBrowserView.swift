@@ -54,13 +54,9 @@ struct DatabaseBrowserView: View {
                     Image(systemName: "plus")
                         .font(.caption.weight(.semibold))
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
                 .help("New Tab")
             }
         }
-        .toolbarBackground(.visible, for: .windowToolbar)
-        .toolbarBackground(.ultraThinMaterial, for: .windowToolbar)
         .overlay(alignment: .topLeading) {
             if let error = appState.lastError {
                 ErrorBannerView(message: error) { appState.lastError = nil }
@@ -121,7 +117,7 @@ struct CollectionSidebarView: View {
                 }
             }
         }
-        .background(.regularMaterial)
+        .background(.ultraThinMaterial)
     }
 }
 

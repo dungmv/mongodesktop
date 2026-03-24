@@ -21,7 +21,7 @@ struct DatabaseDetailView: View {
             contentArea
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial)
+        .background(.ultraThinMaterial)
     }
 
     // MARK: Toolbar Area
@@ -66,13 +66,11 @@ struct DatabaseDetailView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(.ultraThinMaterial)
 
             if tabState.isAdvancedQuery {
                 advancedQueryRow
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(.ultraThinMaterial)
             }
 
             Divider()
@@ -83,7 +81,6 @@ struct DatabaseDetailView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 6)
         }
-        .background(.regularMaterial)
     }
 
     private var advancedQueryRow: some View {
@@ -226,7 +223,6 @@ struct DatabaseDetailView: View {
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(.ultraThinMaterial)
         .overlay(alignment: .bottom) {
             Divider().opacity(0.3)
         }
