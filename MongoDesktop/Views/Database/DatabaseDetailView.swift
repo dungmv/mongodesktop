@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import SwiftBSON
 
@@ -6,6 +7,7 @@ import SwiftBSON
 struct DatabaseDetailView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var tabState: QueryTabState
+    @EnvironmentObject private var globalSettings: GlobalSettings
     @Environment(\.databaseTabContext) private var tabContext
 
     var body: some View {
@@ -178,7 +180,7 @@ struct DatabaseDetailView: View {
             } else if tabState.viewMode == .table {
                 DocumentTableView(documents: tabState.documents, selection: $tabState.selectedRowIds)
             } else {
-                DocumentJSONView(documents: tabState.documents)
+                DocumentJSONView(documents: tabState.documents, timeZone: globalSettings.displayTimeZone)
             }
         }
     }
@@ -285,6 +287,7 @@ struct DocumentRow: Identifiable {
 // MARK: - DocumentTableView
 
 struct DocumentTableView: View {
+    @EnvironmentObject private var globalSettings: GlobalSettings
     let rows: [DocumentRow]
     @Binding var selection: Set<String>
 
@@ -360,7 +363,7 @@ struct DocumentTableView: View {
             Table(rows, selection: $selection) {
                 TableColumnForEach(columns, id: \.self) { key in
                     TableColumn("\(key) \(typeString(for: key))") { row in
-                        Text(displayValue(row.document[key]))
+                        Text(displayValue(row.document[key], timeZone: globalSettings.displayTimeZone))
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
@@ -373,7 +376,14 @@ struct DocumentTableView: View {
 
 }
 
-fileprivate func displayValue(_ value: BSON?) -> String {
+fileprivate let displayDateFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssXXXXX"
+    return formatter
+}()
+
+fileprivate func displayValue(_ value: BSON?, timeZone: TimeZone) -> String {
     guard let value else { return "" }
     switch value {
     case .document(let doc):
@@ -393,7 +403,8 @@ fileprivate func displayValue(_ value: BSON?) -> String {
     case .null:
         return "null"
     case .datetime(let d):
-        return d.description
+        displayDateFormatter.timeZone = timeZone
+        return displayDateFormatter.string(from: d)
     default:
         return String(describing: value)
     }
@@ -403,6 +414,7 @@ fileprivate func displayValue(_ value: BSON?) -> String {
 
 struct DocumentJSONView: View {
     let documents: [BSONDocument]
+    let timeZone: TimeZone
 
     var body: some View {
         if documents.isEmpty {
@@ -419,7 +431,7 @@ struct DocumentJSONView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
                     ForEach(Array(documents.enumerated()), id: \.offset) { index, doc in
-                        JSONDocumentCard(index: index, document: doc)
+                        JSONDocumentCard(index: index, document: doc, timeZone: timeZone)
                     }
                 }
                 .padding(16)
@@ -433,9 +445,10 @@ struct DocumentJSONView: View {
 struct JSONDocumentCard: View {
     let index: Int
     let document: BSONDocument
+    let timeZone: TimeZone
 
     private var nodes: [JSONNode] {
-        document.map { JSONNode(key: $0.key, value: $0.value) }
+        document.map { JSONNode(key: $0.key, value: $0.value, timeZone: timeZone) }
     }
 
     var body: some View {
@@ -461,6 +474,7 @@ struct JSONDocumentCard: View {
 
 struct JSONTreeView: View {
     let document: BSONDocument
+    let timeZone: TimeZone
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -472,7 +486,7 @@ struct JSONTreeView: View {
     }
 
     private var nodes: [JSONNode] {
-        document.map { JSONNode(key: $0.key, value: $0.value) }
+        document.map { JSONNode(key: $0.key, value: $0.value, timeZone: timeZone) }
     }
 }
 
@@ -485,20 +499,20 @@ struct JSONNode: Identifiable {
     let children: [JSONNode]?
     let rawValue: BSON
 
-    init(key: String? = nil, value: BSON) {
+    init(key: String? = nil, value: BSON, timeZone: TimeZone) {
         self.key = key
         self.rawValue = value
         switch value {
         case .document(let doc):
             self.value = "{ \(doc.count) fields }"
-            self.children = doc.map { JSONNode(key: $0.key, value: $0.value) }
+            self.children = doc.map { JSONNode(key: $0.key, value: $0.value, timeZone: timeZone) }
         case .array(let array):
             self.value = "[ \(array.count) items ]"
             self.children = array.enumerated().map { index, item in
-                JSONNode(key: "[\(index)]", value: item)
+                JSONNode(key: "[\(index)]", value: item, timeZone: timeZone)
             }
         default:
-            self.value = displayValue(value)
+            self.value = displayValue(value, timeZone: timeZone)
             self.children = nil
         }
     }

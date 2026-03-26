@@ -37,6 +37,7 @@ struct MongoDesktopApp: App {
         WindowGroup("Connections") {
             ConnectionsListView()
                 .environmentObject(connectionStore)
+                .environmentObject(GlobalSettings.shared)
         }
         .defaultSize(width: 720, height: 500)
 
@@ -44,6 +45,7 @@ struct MongoDesktopApp: App {
         WindowGroup("Database", for: ConnectionProfile.ID.self) { $connectionId in
             DatabaseWindowView(connectionId: connectionId)
                 .environmentObject(connectionStore)
+                .environmentObject(GlobalSettings.shared)
         }
         .defaultSize(width: 1000, height: 720)
         .restorationBehavior(.disabled)
