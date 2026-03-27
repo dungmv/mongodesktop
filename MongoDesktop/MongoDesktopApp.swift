@@ -51,5 +51,18 @@ struct MongoDesktopApp: App {
         .restorationBehavior(.disabled)
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified(showsTitle: true))
+
+        Settings {
+            SettingsView()
+                .environmentObject(GlobalSettings.shared)
+        }
+
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                SettingsLink {
+                    Text("Settings…")
+                }
+            }
+        }
     }
 }
