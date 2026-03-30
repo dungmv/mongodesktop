@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1B2C3D42F00000100AAA001 /* SwiftTreeSitter in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D42F00000100AAA011 /* SwiftTreeSitter */; };
+		A1B2C3D42F00000100AAA002 /* TreeSitterJSON in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D42F00000100AAA012 /* TreeSitterJSON */; };
 		5C3182DD2DBFF0D8004C59B0 /* SwiftBSON in Frameworks */ = {isa = PBXBuildFile; productRef = 5C3182DC2DBFF0D8004C59B0 /* SwiftBSON */; };
 /* End PBXBuildFile section */
 
@@ -27,6 +29,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D42F00000100AAA001 /* SwiftTreeSitter in Frameworks */,
+				A1B2C3D42F00000100AAA002 /* TreeSitterJSON in Frameworks */,
 				5C3182DD2DBFF0D8004C59B0 /* SwiftBSON in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -71,6 +75,8 @@
 			);
 			name = MongoDesktop;
 			packageProductDependencies = (
+				A1B2C3D42F00000100AAA011 /* SwiftTreeSitter */,
+				A1B2C3D42F00000100AAA012 /* TreeSitterJSON */,
 				5C3182DC2DBFF0D8004C59B0 /* SwiftBSON */,
 			);
 			productName = MongoDesktop;
@@ -102,6 +108,8 @@
 			mainGroup = 5C3182C12DBFF006004C59B0;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				A1B2C3D42F00000100AAA021 /* XCRemoteSwiftPackageReference "swift-tree-sitter" */,
+				A1B2C3D42F00000100AAA022 /* XCRemoteSwiftPackageReference "tree-sitter-json" */,
 				5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "swift-bson" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -409,6 +417,22 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A1B2C3D42F00000100AAA021 /* XCRemoteSwiftPackageReference "swift-tree-sitter" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/tree-sitter/swift-tree-sitter";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.0;
+			};
+		};
+		A1B2C3D42F00000100AAA022 /* XCRemoteSwiftPackageReference "tree-sitter-json" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/tree-sitter/tree-sitter-json";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.24.0;
+			};
+		};
 		5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "swift-bson" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/mongodb/swift-bson";
@@ -420,6 +444,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A1B2C3D42F00000100AAA011 /* SwiftTreeSitter */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1B2C3D42F00000100AAA021 /* XCRemoteSwiftPackageReference "swift-tree-sitter" */;
+			productName = SwiftTreeSitter;
+		};
+		A1B2C3D42F00000100AAA012 /* TreeSitterJSON */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1B2C3D42F00000100AAA022 /* XCRemoteSwiftPackageReference "tree-sitter-json" */;
+			productName = TreeSitterJSON;
+		};
 		5C3182DC2DBFF0D8004C59B0 /* SwiftBSON */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "swift-bson" */;

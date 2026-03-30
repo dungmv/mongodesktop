@@ -9,6 +9,9 @@ struct DatabaseDetailView: View {
     @EnvironmentObject private var tabState: QueryTabState
     @EnvironmentObject private var globalSettings: GlobalSettings
     @Environment(\.databaseTabContext) private var tabContext
+    @State private var filterError: String? = nil
+    @State private var sortError: String? = nil
+    @State private var projectionError: String? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,10 +38,19 @@ struct DatabaseDetailView: View {
                     .foregroundStyle(.secondary)
                     .font(.body)
 
-                TextField("Filter JSON  { \"field\": \"value\" }", text: $tabState.filterText)
-                    .textFieldStyle(.plain)
-                    .font(.system(.body, design: .monospaced))
-                    .frame(maxWidth: .infinity)
+                JSONEditorView(
+                    text: $tabState.filterText,
+                    errorMessage: $filterError,
+                    minHeight: 28
+                )
+                .frame(maxWidth: .infinity)
+                .frame(height: 28)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(filterError == nil ? Color.secondary.opacity(0.35) : .red.opacity(0.7), lineWidth: 1)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .help(filterError ?? "Filter JSON { \"field\": \"value\" }")
 
                 Button(action: { withAnimation(.easeInOut(duration: 0.2)) { tabState.isAdvancedQuery.toggle() } }) {
                     Label(tabState.isAdvancedQuery ? "Simple" : "Advanced", systemImage: "slider.horizontal.3")
@@ -57,6 +69,8 @@ struct DatabaseDetailView: View {
                 }
                 .buttonStyle(.plain)
                 .keyboardShortcut(.return, modifiers: [.command])
+                .disabled(hasSyntaxError)
+                .opacity(hasSyntaxError ? 0.55 : 1)
 
                 Button(action: refresh) {
                     Label("Refresh", systemImage: "arrow.clockwise")
@@ -64,7 +78,6 @@ struct DatabaseDetailView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -87,29 +100,41 @@ struct DatabaseDetailView: View {
 
     private var advancedQueryRow: some View {
         HStack(spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("Sort")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                TextField("Sort JSON  { \"field\": 1 }", text: $tabState.sortText)
-                    .textFieldStyle(.plain)
-                    .font(.system(.callout, design: .monospaced))
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            Text("Sort")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
 
-            Divider()
-                .frame(height: 16)
-                .opacity(0.5)
-
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("Projection")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                TextField("Projection JSON  { \"field\": 1 }", text: $tabState.projectionText)
-                    .textFieldStyle(.plain)
-                    .font(.system(.callout, design: .monospaced))
+            JSONEditorView(
+                text: $tabState.sortText,
+                errorMessage: $sortError,
+                minHeight: 28
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: 28)
+            .overlay {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(sortError == nil ? Color.secondary.opacity(0.35) : .red.opacity(0.7), lineWidth: 1)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .help(sortError ?? "Sort JSON { \"field\": 1 }")
+
+            Text("Projection")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+
+            JSONEditorView(
+                text: $tabState.projectionText,
+                errorMessage: $projectionError,
+                minHeight: 28
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: 28)
+            .overlay {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(projectionError == nil ? Color.secondary.opacity(0.35) : .red.opacity(0.7), lineWidth: 1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .help(projectionError ?? "Projection JSON { \"field\": 1 }")
         }
     }
 
@@ -193,6 +218,7 @@ struct DatabaseDetailView: View {
 
     // MARK: Actions
     private func runFind() {
+        guard !hasSyntaxError else { return }
         tabState.resetPaging()
         Task { await tabState.runFind(appState: appState) }
     }
@@ -204,6 +230,12 @@ struct DatabaseDetailView: View {
             tabState.resetPaging()
             await tabState.runFind(appState: appState)
         }
+    }
+
+    private var hasSyntaxError: Bool {
+        if filterError != nil { return true }
+        if tabState.isAdvancedQuery && (sortError != nil || projectionError != nil) { return true }
+        return false
     }
 
     private func tabBar(_ context: DatabaseTabContext) -> some View {
