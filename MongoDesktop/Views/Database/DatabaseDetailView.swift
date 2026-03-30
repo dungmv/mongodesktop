@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import SwiftBSON
 
@@ -5,16 +6,24 @@ import SwiftBSON
 
 struct DatabaseDetailView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var tabState: QueryTabState
+    @EnvironmentObject private var globalSettings: GlobalSettings
+    @Environment(\.databaseTabContext) private var tabContext
 
     var body: some View {
         VStack(spacing: 0) {
+            if let tabContext {
+                if tabContext.tabs.count > 1 {
+                    tabBar(tabContext)
+                }
+            }
             toolbarArea
             Divider()
                 .opacity(0.4)
             contentArea
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial)
+        .background(.ultraThinMaterial)
     }
 
     // MARK: Toolbar Area
@@ -26,13 +35,13 @@ struct DatabaseDetailView: View {
                     .foregroundStyle(.secondary)
                     .font(.body)
 
-                TextField("Filter JSON  { \"field\": \"value\" }", text: $appState.filterText)
+                TextField("Filter JSON  { \"field\": \"value\" }", text: $tabState.filterText)
                     .textFieldStyle(.plain)
                     .font(.system(.body, design: .monospaced))
                     .frame(maxWidth: .infinity)
 
-                Button(action: { withAnimation(.easeInOut(duration: 0.2)) { appState.isAdvancedQuery.toggle() } }) {
-                    Label(appState.isAdvancedQuery ? "Simple" : "Advanced", systemImage: "slider.horizontal.3")
+                Button(action: { withAnimation(.easeInOut(duration: 0.2)) { tabState.isAdvancedQuery.toggle() } }) {
+                    Label(tabState.isAdvancedQuery ? "Simple" : "Advanced", systemImage: "slider.horizontal.3")
                         .font(.caption.weight(.medium))
                 }
                 .buttonStyle(.bordered)
@@ -55,16 +64,15 @@ struct DatabaseDetailView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(.ultraThinMaterial)
 
-            if appState.isAdvancedQuery {
+            if tabState.isAdvancedQuery {
                 advancedQueryRow
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(.ultraThinMaterial)
             }
 
             Divider()
@@ -75,28 +83,33 @@ struct DatabaseDetailView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 6)
         }
-        .background(.regularMaterial)
     }
 
     private var advancedQueryRow: some View {
         HStack(spacing: 10) {
-            Image(systemName: "line.3.horizontal.decrease.circle.fill")
-                .foregroundStyle(.secondary)
-                .font(.caption)
-
-            TextField("Sort JSON  { \"field\": 1 }", text: $appState.sortText)
-                .textFieldStyle(.plain)
-                .font(.system(.callout, design: .monospaced))
-                .frame(maxWidth: .infinity)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("Sort")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                TextField("Sort JSON  { \"field\": 1 }", text: $tabState.sortText)
+                    .textFieldStyle(.plain)
+                    .font(.system(.callout, design: .monospaced))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Divider()
                 .frame(height: 16)
                 .opacity(0.5)
 
-            TextField("Projection JSON  { \"field\": 1 }", text: $appState.projectionText)
-                .textFieldStyle(.plain)
-                .font(.system(.callout, design: .monospaced))
-                .frame(maxWidth: .infinity)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("Projection")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                TextField("Projection JSON  { \"field\": 1 }", text: $tabState.projectionText)
+                    .textFieldStyle(.plain)
+                    .font(.system(.callout, design: .monospaced))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -104,7 +117,7 @@ struct DatabaseDetailView: View {
 
     // MARK: View Mode Picker
     private var viewModePicker: some View {
-        Picker("", selection: $appState.viewMode) {
+        Picker("", selection: $tabState.viewMode) {
             ForEach(DocumentViewMode.allCases) { mode in
                 Image(systemName: mode == .table ? "tablecells" : "curlybraces")
                     .tag(mode)
@@ -117,39 +130,39 @@ struct DatabaseDetailView: View {
     // MARK: Pagination
     private var paginationRow: some View {
         HStack(spacing: 12) {
-            Button(action: { Task { await appState.previousPage() } }) {
+            Button(action: { Task { await tabState.previousPage(appState: appState) } }) {
                 Image(systemName: "chevron.left")
                     .font(.caption.weight(.semibold))
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            .disabled(appState.currentPage == 0)
+            .disabled(tabState.currentPage == 0)
 
-            Text("Trang \(appState.currentPage + 1)")
+            Text("Trang \(tabState.currentPage + 1)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
 
-            Button(action: { Task { await appState.nextPage() } }) {
+            Button(action: { Task { await tabState.nextPage(appState: appState) } }) {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            .disabled(!appState.hasMore)
+            .disabled(!tabState.hasMore)
 
             Divider()
                 .frame(height: 14)
                 .padding(.horizontal, 4)
 
-            Text("\(appState.documents.count) docs")
+            Text("\(tabState.documents.count) docs")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
 
             Spacer()
 
-            Text("Giới hạn \(appState.pageSize)")
+            Text("Giới hạn \(tabState.pageSize)")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             
@@ -170,25 +183,94 @@ struct DatabaseDetailView: View {
                     .padding(.top, 40)
                     Spacer()
                 }
-            } else if appState.viewMode == .table {
-                DocumentTableView(documents: appState.documents, selection: $appState.selectedRowIds)
+            } else if tabState.viewMode == .table {
+                DocumentTableView(documents: tabState.documents, selection: $tabState.selectedRowIds)
             } else {
-                DocumentJSONView(documents: appState.documents)
+                DocumentJSONView(documents: tabState.documents, timeZone: globalSettings.displayTimeZone)
             }
         }
     }
 
     // MARK: Actions
     private func runFind() {
-        guard let db = appState.selectedDatabase,
-              let collection = appState.selectedCollection else { return }
-        appState.currentPage = 0
-        Task { await appState.runFind(database: db, collection: collection) }
+        tabState.resetPaging()
+        Task { await tabState.runFind(appState: appState) }
     }
 
     private func refresh() {
         guard let db = appState.selectedDatabase else { return }
-        Task { await appState.refreshCollections(database: db) }
+        Task {
+            await appState.refreshCollections(database: db)
+            tabState.resetPaging()
+            await tabState.runFind(appState: appState)
+        }
+    }
+
+    private func tabBar(_ context: DatabaseTabContext) -> some View {
+        ScrollView(.horizontal, showsIndicators: true) {
+            HStack(spacing: 8) {
+                ForEach(context.tabs) { tab in
+                    TabPill(
+                        title: tab.title,
+                        isSelected: tab.id == context.selectedId,
+                        onSelect: { context.select(tab.id) },
+                        onClose: { context.close(tab.id) }
+                    )
+                }
+                Button(action: context.add) {
+                    Image(systemName: "plus")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(Color.secondary.opacity(0.12)))
+                }
+                .buttonStyle(.plain)
+                .help("New Tab")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .overlay(alignment: .bottom) {
+            Divider().opacity(0.3)
+        }
+    }
+}
+
+private struct TabPill: View {
+    let title: String
+    let isSelected: Bool
+    let onSelect: () -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button(action: onSelect) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .lineLimit(1)
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 14, height: 14)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule(style: .continuous)
+                .fill(isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(Color.primary.opacity(isSelected ? 0.22 : 0.12), lineWidth: 1)
+        )
     }
 }
 
@@ -211,6 +293,7 @@ struct DocumentRow: Identifiable {
 // MARK: - DocumentTableView
 
 struct DocumentTableView: View {
+    @EnvironmentObject private var globalSettings: GlobalSettings
     let rows: [DocumentRow]
     @Binding var selection: Set<String>
 
@@ -286,7 +369,7 @@ struct DocumentTableView: View {
             Table(rows, selection: $selection) {
                 TableColumnForEach(columns, id: \.self) { key in
                     TableColumn("\(key) \(typeString(for: key))") { row in
-                        Text(displayValue(row.document[key]))
+                        Text(displayValue(row.document[key], timeZone: globalSettings.displayTimeZone))
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
@@ -299,7 +382,14 @@ struct DocumentTableView: View {
 
 }
 
-fileprivate func displayValue(_ value: BSON?) -> String {
+fileprivate let displayDateFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssXXXXX"
+    return formatter
+}()
+
+fileprivate func displayValue(_ value: BSON?, timeZone: TimeZone) -> String {
     guard let value else { return "" }
     switch value {
     case .document(let doc):
@@ -319,7 +409,8 @@ fileprivate func displayValue(_ value: BSON?) -> String {
     case .null:
         return "null"
     case .datetime(let d):
-        return d.description
+        displayDateFormatter.timeZone = timeZone
+        return displayDateFormatter.string(from: d)
     default:
         return String(describing: value)
     }
@@ -329,6 +420,7 @@ fileprivate func displayValue(_ value: BSON?) -> String {
 
 struct DocumentJSONView: View {
     let documents: [BSONDocument]
+    let timeZone: TimeZone
 
     var body: some View {
         if documents.isEmpty {
@@ -345,7 +437,7 @@ struct DocumentJSONView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
                     ForEach(Array(documents.enumerated()), id: \.offset) { index, doc in
-                        JSONDocumentCard(index: index, document: doc)
+                        JSONDocumentCard(index: index, document: doc, timeZone: timeZone)
                     }
                 }
                 .padding(16)
@@ -359,9 +451,10 @@ struct DocumentJSONView: View {
 struct JSONDocumentCard: View {
     let index: Int
     let document: BSONDocument
+    let timeZone: TimeZone
 
     private var nodes: [JSONNode] {
-        document.map { JSONNode(key: $0.key, value: $0.value) }
+        document.map { JSONNode(key: $0.key, value: $0.value, timeZone: timeZone) }
     }
 
     var body: some View {
@@ -387,6 +480,7 @@ struct JSONDocumentCard: View {
 
 struct JSONTreeView: View {
     let document: BSONDocument
+    let timeZone: TimeZone
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -398,7 +492,7 @@ struct JSONTreeView: View {
     }
 
     private var nodes: [JSONNode] {
-        document.map { JSONNode(key: $0.key, value: $0.value) }
+        document.map { JSONNode(key: $0.key, value: $0.value, timeZone: timeZone) }
     }
 }
 
@@ -411,20 +505,20 @@ struct JSONNode: Identifiable {
     let children: [JSONNode]?
     let rawValue: BSON
 
-    init(key: String? = nil, value: BSON) {
+    init(key: String? = nil, value: BSON, timeZone: TimeZone) {
         self.key = key
         self.rawValue = value
         switch value {
         case .document(let doc):
             self.value = "{ \(doc.count) fields }"
-            self.children = doc.map { JSONNode(key: $0.key, value: $0.value) }
+            self.children = doc.map { JSONNode(key: $0.key, value: $0.value, timeZone: timeZone) }
         case .array(let array):
             self.value = "[ \(array.count) items ]"
             self.children = array.enumerated().map { index, item in
-                JSONNode(key: "[\(index)]", value: item)
+                JSONNode(key: "[\(index)]", value: item, timeZone: timeZone)
             }
         default:
-            self.value = displayValue(value)
+            self.value = displayValue(value, timeZone: timeZone)
             self.children = nil
         }
     }

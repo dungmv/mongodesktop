@@ -1,19 +1,29 @@
 import SwiftUI
+import AppKit
 
 // MARK: - DatabaseBrowserView
 
 struct DatabaseBrowserView: View {
     @EnvironmentObject private var connectionStore: ConnectionStore
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var tabState: QueryTabState
+    @Environment(\.addDatabaseTab) private var addDatabaseTab
     @State private var showServerInfo = false
 
     var body: some View {
         NavigationSplitView {
             CollectionSidebarView()
                 .environmentObject(appState)
+                .environmentObject(tabState)
         } detail: {
             DatabaseDetailView()
                 .environmentObject(appState)
+                .environmentObject(tabState)
+        }
+        .onChange(of: appState.selectedCollection) { _, newValue in
+            if let newValue, !newValue.isEmpty {
+                tabState.title = newValue
+            }
         }
         .navigationSplitViewStyle(.balanced)
         .navigationTitle(appState.connectionName)
@@ -28,25 +38,25 @@ struct DatabaseBrowserView: View {
 
                 DatabasePickerButton()
                     .environmentObject(appState)
-            }
 
-            ToolbarItemGroup(placement: .automatic) {
-                QueryStatusView()
+                DatabaseCollectionInlineView()
                     .environmentObject(appState)
             }
 
+            ToolbarItem(placement: .principal) {
+                ConnectionStatusCenterView(showServerInfo: $showServerInfo)
+                    .environmentObject(appState)
+                    .environmentObject(tabState)
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
-                Button(action: { showServerInfo.toggle() }) {
-                    Image(systemName: "info.circle")
+                Button(action: addDatabaseTab) {
+                    Image(systemName: "plus")
+                        .font(.caption.weight(.semibold))
                 }
-                .help("Server Information")
-                .popover(isPresented: $showServerInfo, arrowEdge: .bottom) {
-                    ServerInfoPopoverView()
-                }
+                .help("New Tab")
             }
         }
-        .toolbarBackground(.visible, for: .windowToolbar)
-        .toolbarBackground(.ultraThinMaterial, for: .windowToolbar)
         .overlay(alignment: .topLeading) {
             if let error = appState.lastError {
                 ErrorBannerView(message: error) { appState.lastError = nil }
@@ -62,6 +72,7 @@ struct DatabaseBrowserView: View {
 
 struct CollectionSidebarView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var tabState: QueryTabState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -100,83 +111,161 @@ struct CollectionSidebarView: View {
                 }
                 .listStyle(.sidebar)
                 .scrollContentBackground(.hidden)
-                .onChange(of: appState.selectedCollection) { _, newValue in
-                    guard let newValue, let db = appState.selectedDatabase else { return }
-                    appState.currentPage = 0
-                    Task { await appState.runFind(database: db, collection: newValue) }
+                .onChange(of: appState.selectedCollection) { _, _ in
+                    tabState.resetPaging()
+                    Task { await tabState.runFind(appState: appState) }
                 }
             }
         }
-        .background(.regularMaterial)
+        .background(.ultraThinMaterial)
     }
 }
 
-// MARK: - QueryStatusView
+// MARK: - DatabaseCollectionInlineView
 
-struct QueryStatusView: View {
+struct DatabaseCollectionInlineView: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if let db = appState.selectedDatabase, !db.isEmpty {
+                Text(db)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+            }
+
+            if let col = appState.selectedCollection, !col.isEmpty {
+                Text(col)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.trailing, 8)
+    }
+}
+
+// MARK: - Titlebar Leading Content
+
+struct TitlebarLeadingContent: View {
+    @EnvironmentObject private var appState: AppState
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Button(action: {
+                WindowCoordinator.shared.showConnectionsWindow()
+            }) {
+                Image(systemName: "server.rack")
+            }
+            .help("Connections")
+
+            DatabasePickerButton()
+                .environmentObject(appState)
+
+            DatabaseCollectionInlineView()
+                .environmentObject(appState)
+        }
+        .padding(.leading, 6)
+    }
+}
+
+// MARK: - Titlebar Leading Accessory Host
+
+struct TitlebarLeadingAccessoryHost<Content: View>: NSViewRepresentable {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        NSView(frame: .zero)
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if context.coordinator.hostingView == nil {
+            context.coordinator.hostingView = NSHostingView(rootView: content)
+        } else {
+            context.coordinator.hostingView?.rootView = content
+        }
+
+        guard let window = nsView.window,
+              let hostingView = context.coordinator.hostingView
+        else { return }
+
+        if context.coordinator.controller == nil {
+            let controller = NSTitlebarAccessoryViewController()
+            controller.view = hostingView
+            controller.layoutAttribute = .leading
+            window.addTitlebarAccessoryViewController(controller)
+            context.coordinator.controller = controller
+        } else if context.coordinator.controller?.view !== hostingView {
+            context.coordinator.controller?.view = hostingView
+        }
+    }
+
+    final class Coordinator {
+        var controller: NSTitlebarAccessoryViewController?
+        var hostingView: NSHostingView<Content>?
+    }
+}
+
+// MARK: - ConnectionStatusCenterView
+
+struct ConnectionStatusCenterView: View {
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var tabState: QueryTabState
+    @Binding var showServerInfo: Bool
+
+    var body: some View {
         HStack(spacing: 12) {
-            // Connection Name
             HStack(spacing: 6) {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 7, height: 7)
+                Button(action: { showServerInfo.toggle() }) {
+                    Image(systemName: "info.circle")
+                }
+                .buttonStyle(.plain)
+                .help("Server Information")
+                .popover(isPresented: $showServerInfo, arrowEdge: .bottom) {
+                    ServerInfoPopoverView()
+                }
+
                 Text(appState.connectionName)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.primary)
             }
 
-            // Database Name
-            if let db = appState.selectedDatabase {
-                Divider().frame(height: 14)
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "cylinder.split.1x2")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(db)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                }
-            }
+            Spacer(minLength: 12)
 
-            // Collection Name
-            if let col = appState.selectedCollection {
-                Divider().frame(height: 14)
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "tablecells")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(col)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                }
-            }
+            if tabState.isLoading || tabState.lastQueryDuration != nil {
+                HStack(spacing: 8) {
+                    Divider().frame(height: 14)
 
-            if appState.isLoading || appState.lastQueryDuration != nil {
-                Divider().frame(height: 14)
-            }
-            
-            if appState.isLoading {
-                ProgressView()
-                    .controlSize(.mini)
-                    .frame(width: 12, height: 12)
-                    .fixedSize()
-                    .opacity(appState.isLoading ? 1 : 0)
-            } else {
-                HStack(spacing: 4) {
-                    Image(systemName: "clock")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(appState.lastQueryDuration.map { formattedDuration($0) } ?? "0ms")
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                    if tabState.isLoading {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .frame(width: 12, height: 12)
+                            .fixedSize()
+                            .opacity(tabState.isLoading ? 1 : 0)
+                    } else {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(tabState.lastQueryDuration.map { formattedDuration($0) } ?? "0ms")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
         }
+        .frame(minWidth: 260, alignment: .center)
+        .padding(.horizontal, 12)
     }
 
     private func formattedDuration(_ seconds: TimeInterval) -> String {

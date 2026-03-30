@@ -26,6 +26,7 @@ struct DatabasePickerButton: View {
                 onSelect: { db in
                     isPresented = false
                     appState.selectedDatabase = db
+                    appState.selectedCollection = nil
                     Task { await appState.refreshCollections(database: db) }
                 }
             )
