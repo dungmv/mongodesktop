@@ -142,6 +142,7 @@ struct DatabaseCollectionInlineView: View {
                     .lineLimit(1)
             }
         }
+        .padding(.trailing, 8)
     }
 }
 
@@ -238,27 +239,33 @@ struct ConnectionStatusCenterView: View {
                     .foregroundStyle(.primary)
             }
 
-            if tabState.isLoading || tabState.lastQueryDuration != nil {
-                Divider().frame(height: 14)
-            }
+            Spacer(minLength: 12)
 
-            if tabState.isLoading {
-                ProgressView()
-                    .controlSize(.mini)
-                    .frame(width: 12, height: 12)
-                    .fixedSize()
-                    .opacity(tabState.isLoading ? 1 : 0)
-            } else {
-                HStack(spacing: 4) {
-                    Image(systemName: "clock")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(tabState.lastQueryDuration.map { formattedDuration($0) } ?? "0ms")
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
+            if tabState.isLoading || tabState.lastQueryDuration != nil {
+                HStack(spacing: 8) {
+                    Divider().frame(height: 14)
+
+                    if tabState.isLoading {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .frame(width: 12, height: 12)
+                            .fixedSize()
+                            .opacity(tabState.isLoading ? 1 : 0)
+                    } else {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(tabState.lastQueryDuration.map { formattedDuration($0) } ?? "0ms")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
         }
+        .frame(minWidth: 260, alignment: .center)
+        .padding(.horizontal, 12)
     }
 
     private func formattedDuration(_ seconds: TimeInterval) -> String {

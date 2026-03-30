@@ -87,23 +87,29 @@ struct DatabaseDetailView: View {
 
     private var advancedQueryRow: some View {
         HStack(spacing: 10) {
-            Image(systemName: "line.3.horizontal.decrease.circle.fill")
-                .foregroundStyle(.secondary)
-                .font(.caption)
-
-            TextField("Sort JSON  { \"field\": 1 }", text: $tabState.sortText)
-                .textFieldStyle(.plain)
-                .font(.system(.callout, design: .monospaced))
-                .frame(maxWidth: .infinity)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("Sort")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                TextField("Sort JSON  { \"field\": 1 }", text: $tabState.sortText)
+                    .textFieldStyle(.plain)
+                    .font(.system(.callout, design: .monospaced))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Divider()
                 .frame(height: 16)
                 .opacity(0.5)
 
-            TextField("Projection JSON  { \"field\": 1 }", text: $tabState.projectionText)
-                .textFieldStyle(.plain)
-                .font(.system(.callout, design: .monospaced))
-                .frame(maxWidth: .infinity)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("Projection")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                TextField("Projection JSON  { \"field\": 1 }", text: $tabState.projectionText)
+                    .textFieldStyle(.plain)
+                    .font(.system(.callout, design: .monospaced))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
