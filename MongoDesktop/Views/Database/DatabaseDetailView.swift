@@ -385,7 +385,10 @@ struct DocumentTableView: View {
         } else {
             Table(rows, selection: $selection) {
                 TableColumnForEach(columns, id: \.self) { key in
-                    TableColumn("\(key) \(typeString(for: key))") { row in
+                    TableColumn(
+                        Text(key).bold() +
+                        Text(" \(typeString(for: key))").foregroundStyle(.secondary)
+                    ) { row in
                         Text(displayValue(row.document[key], timeZone: globalSettings.displayTimeZone))
                             .lineLimit(1)
                             .truncationMode(.tail)
