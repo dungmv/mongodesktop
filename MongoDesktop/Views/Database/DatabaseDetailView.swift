@@ -72,12 +72,6 @@ struct DatabaseDetailView: View {
                 .disabled(hasSyntaxError)
                 .opacity(hasSyntaxError ? 0.55 : 1)
 
-                Button(action: refresh) {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                        .font(.caption.weight(.medium))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -221,15 +215,6 @@ struct DatabaseDetailView: View {
         guard !hasSyntaxError else { return }
         tabState.resetPaging()
         Task { await tabState.runFind(appState: appState) }
-    }
-
-    private func refresh() {
-        guard let db = appState.selectedDatabase else { return }
-        Task {
-            await appState.refreshCollections(database: db)
-            tabState.resetPaging()
-            await tabState.runFind(appState: appState)
-        }
     }
 
     private var hasSyntaxError: Bool {
