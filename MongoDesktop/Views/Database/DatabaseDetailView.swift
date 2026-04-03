@@ -311,6 +311,7 @@ struct DocumentRow: Identifiable {
 
 struct DocumentTableView: View {
     @EnvironmentObject private var globalSettings: GlobalSettings
+    @State private var columnCustomization = TableColumnCustomization<DocumentRow>()
     let rows: [DocumentRow]
     @Binding var selection: Set<String>
 
@@ -383,7 +384,7 @@ struct DocumentTableView: View {
                 Spacer()
             }
         } else {
-            Table(rows, selection: $selection) {
+            Table(rows, selection: $selection, columnCustomization: $columnCustomization) {
                 TableColumnForEach(columns, id: \.self) { key in
                     TableColumn(
                         Text(key).bold() +
@@ -393,6 +394,7 @@ struct DocumentTableView: View {
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
+                    .customizationID(key)
                 }
             }
             .tableStyle(.inset(alternatesRowBackgrounds: true))
