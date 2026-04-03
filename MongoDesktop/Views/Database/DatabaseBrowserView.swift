@@ -73,6 +73,13 @@ struct DatabaseBrowserView: View {
 struct CollectionSidebarView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var tabState: QueryTabState
+    @State private var collectionFilterText = ""
+
+    private var filteredCollections: [String] {
+        let keyword = collectionFilterText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !keyword.isEmpty else { return appState.collections }
+        return appState.collections.filter { $0.localizedCaseInsensitiveContains(keyword) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -82,7 +89,7 @@ struct CollectionSidebarView: View {
                 Text("Collections")
                     .font(.headline)
                 Spacer()
-                Text("\(appState.collections.count)")
+                Text("\(filteredCollections.count)")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal, 6)
@@ -91,6 +98,18 @@ struct CollectionSidebarView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
+
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Filter collections", text: $collectionFilterText)
+                    .textFieldStyle(.plain)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, 10)
+            .padding(.bottom, 8)
 
             Divider().padding(.horizontal, 8)
 
@@ -104,8 +123,18 @@ struct CollectionSidebarView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if filteredCollections.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.title2)
+                        .foregroundStyle(.tertiary)
+                    Text("Không tìm thấy collection")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(appState.collections, id: \.self, selection: $appState.selectedCollection) { col in
+                List(filteredCollections, id: \.self, selection: $appState.selectedCollection) { col in
                     Label(col, systemImage: "tablecells")
                         .font(.system(.body, design: .rounded))
                 }
