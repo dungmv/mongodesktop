@@ -9,6 +9,7 @@ final class AppState: ObservableObject {
     @Published var statusMessage: String = "Chưa kết nối"
     @Published var databases: [String] = []
     @Published var collections: [String] = []
+    @Published var timeSeriesCollections: Set<String> = []
     @Published var selectedDatabase: String?
     @Published var selectedCollection: String?
     @Published var isLoading: Bool = false
@@ -58,6 +59,7 @@ final class AppState: ObservableObject {
             statusMessage = "Đã ngắt kết nối"
             databases = []
             collections = []
+            timeSeriesCollections = []
             selectedDatabase = nil
             selectedCollection = nil
             serverVersion = ""
@@ -94,9 +96,12 @@ final class AppState: ObservableObject {
     func refreshCollections(database: String) async {
         await MainActor.run { isLoading = true; lastError = nil }
         do {
-            let list = try await MongoService.shared.listCollections(database: database)
+            let infos = try await MongoService.shared.listCollectionInfos(database: database)
+            let list = infos.map(\.name)
+            let timeSeries = Set(infos.filter(\.isTimeSeries).map(\.name))
             await MainActor.run {
                 collections = list
+                timeSeriesCollections = timeSeries
                 if selectedCollection == nil { selectedCollection = list.first }
             }
         } catch {

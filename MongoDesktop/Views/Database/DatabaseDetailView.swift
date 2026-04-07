@@ -433,6 +433,13 @@ fileprivate func displayValue(_ value: BSON?, timeZone: TimeZone) -> String {
     case .datetime(let d):
         displayDateFormatter.timeZone = timeZone
         return displayDateFormatter.string(from: d)
+    case .binary(let binary):
+        if let uuid = try? binary.toUUID() {
+            return "UUID(\"\(uuid.uuidString.lowercased())\")"
+        }
+        return String(describing: value)
+    case .objectID(let id):
+        return "ObjectId(\"\(id)\")"
     default:
         return String(describing: value)
     }
@@ -607,6 +614,8 @@ struct JSONNodeView: View {
         case .bool: return Color(red: 0.4, green: 0.85, blue: 0.5)
         case .null: return Color(red: 0.7, green: 0.4, blue: 0.4)
         case .int32, .int64, .double, .decimal128: return Color(red: 0.6, green: 0.85, blue: 0.7)
+        case .datetime, .objectID, .binary, .regex, .timestamp, .maxKey, .minKey:
+            return .orange
         default: return .primary
         }
     }

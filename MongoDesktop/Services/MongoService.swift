@@ -1,6 +1,11 @@
 import Foundation
 import SwiftBSON
 
+struct CollectionInfo {
+    let name: String
+    let isTimeSeries: Bool
+}
+
 actor MongoService {
     static let shared = MongoService()
 
@@ -109,26 +114,54 @@ actor MongoService {
     }
 
     func listCollections(database: String) async throws -> [String] {
+        let infos = try await listCollectionInfos(database: database)
+        return infos.map(\.name)
+    }
+
+    func listCollectionInfos(database: String) async throws -> [CollectionInfo] {
         let client = try requireClient()
-        guard let db = mongoc_client_get_database(client, database) else {
-            throw MongoServiceError.commandFailed("Không thể mở database '\(database)'.")
-        }
-        defer { mongoc_database_destroy(db) }
+        let command: BSONDocument = [
+            "listCollections": .int32(1),
+            "nameOnly": .bool(false)
+        ]
+        let reply = try runCommand(client: client, database: database, command: command)
 
-        var error = bson_error_t()
-        guard let names = mongoc_database_get_collection_names_with_opts(db, nil, &error) else {
-            throw MongoServiceError.commandFailed(errorMessage(error))
-        }
-        defer { bson_strfreev(names) }
-
-        var results: [String] = []
-        var index = 0
-        while let namePtr = names.advanced(by: index).pointee {
-            results.append(String(cString: namePtr))
-            index += 1
+        guard case .document(let cursor)? = reply["cursor"],
+              case .array(let batch)? = cursor["firstBatch"] else {
+            throw MongoServiceError.commandFailed("Không đọc được metadata collection.")
         }
 
-        return results.sorted()
+        var results: [CollectionInfo] = []
+        results.reserveCapacity(batch.count)
+        for item in batch {
+            guard case .document(let doc) = item,
+                  case .string(let name)? = doc["name"] else { continue }
+
+            let isTimeSeriesByType: Bool
+            if case .string(let type)? = doc["type"] {
+                isTimeSeriesByType = type.caseInsensitiveCompare("timeseries") == .orderedSame
+            } else {
+                isTimeSeriesByType = false
+            }
+
+            let isTimeSeriesByOptions: Bool
+            if case .document(let options)? = doc["options"] {
+                isTimeSeriesByOptions = options["timeseries"] != nil
+            } else {
+                isTimeSeriesByOptions = false
+            }
+
+            results.append(
+                CollectionInfo(
+                    name: name,
+                    isTimeSeries: isTimeSeriesByType || isTimeSeriesByOptions
+                )
+            )
+        }
+
+        return results.sorted { lhs, rhs in
+            lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
     }
 
     func serverVersion() async throws -> String {
@@ -160,8 +193,8 @@ actor MongoService {
         
         var collectionsCount = 0
         for db in dbs {
-            if let cols = try? await listCollections(database: db) {
-                collectionsCount += cols.count
+            if let infos = try? await listCollectionInfos(database: db) {
+                collectionsCount += infos.count
             }
         }
         
