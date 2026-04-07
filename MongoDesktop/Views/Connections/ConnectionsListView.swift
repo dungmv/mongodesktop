@@ -56,32 +56,6 @@ struct ConnectionsListView: View {
             Divider().padding(.horizontal, 16)
 
             Spacer()
-
-            // Action buttons
-            VStack(spacing: 8) {
-                Button(action: {
-                    draft = ConnectionDraft()
-                    editorMode = .create
-                }) {
-                    Label("New Server...", systemImage: "plus")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-
-                Button(action: { showImportAlert = true }) {
-                    Label("Import URI", systemImage: "square.and.arrow.down")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 16)
         }
         .frame(minWidth: 180, idealWidth: 200)
         .background(.ultraThinMaterial)
@@ -91,13 +65,7 @@ struct ConnectionsListView: View {
 
     private var detailContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Quick Connect bar
-            quickConnectBar
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 12)
-
-            Divider().padding(.horizontal, 16)
+            Divider()
 
             // Connection list
             if connectionStore.connections.isEmpty {
@@ -107,45 +75,21 @@ struct ConnectionsListView: View {
             }
         }
         .background(.ultraThinMaterial)
+        .navigationTitle("")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button(action: {
-                    guard let conn = selectedConnection else { return }
-                    draft = ConnectionDraft(from: conn)
-                    editorMode = .edit(conn.id)
+                    draft = ConnectionDraft()
+                    editorMode = .create
                 }) {
-                    Label("Edit", systemImage: "pencil")
+                    Label("New Server", systemImage: "plus")
                 }
-                .disabled(selectedConnection == nil)
-                .help("Sửa connection")
+                .help("New Server")
 
-                Button(action: deleteSelected) {
-                    Label("Delete", systemImage: "trash")
+                Button(action: { showImportAlert = true }) {
+                    Label("Import URI", systemImage: "square.and.arrow.down")
                 }
-                .disabled(selectedConnection == nil)
-                .help("Xóa connection")
-            }
-        }
-    }
-
-    // MARK: - Quick Connect
-
-    private var quickConnectBar: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Quick Connect")
-                .font(.headline)
-
-            HStack(spacing: 8) {
-                Image(systemName: "link")
-                    .foregroundStyle(.secondary)
-                TextField("mongodb://localhost:27017", text: $importURI)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(.body, design: .monospaced))
-                    .onSubmit { quickConnect() }
-
-                Button("Connect") { quickConnect() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(importURI.trimmingCharacters(in: .whitespaces).isEmpty)
+                .help("Import URI")
             }
         }
     }
@@ -166,7 +110,13 @@ struct ConnectionsListView: View {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                                 WindowCoordinator.shared.hideConnectionsWindow()
                             }
-                        }
+                        },
+                        onEdit: { openEditor(for: connection) },
+                        onDelete: {
+                            selectedId = connection.id
+                            deleteSelected()
+                        },
+                        onDuplicate: { duplicate(connection) }
                     )
                 }
             }
@@ -185,7 +135,7 @@ struct ConnectionsListView: View {
             Text("Chưa có connection nào")
                 .font(.headline)
                 .foregroundStyle(.secondary)
-            Text("Nhấn \"New Server\" hoặc dán URI ở Quick Connect")
+            Text("Nhấn \"New Server\" hoặc dùng \"Import URI\"")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
@@ -205,6 +155,21 @@ struct ConnectionsListView: View {
         if selectedId == connection.id { selectedId = nil }
     }
 
+    private func openEditor(for connection: ConnectionProfile) {
+        selectedId = connection.id
+        draft = ConnectionDraft(from: connection)
+        editorMode = .edit(connection.id)
+    }
+
+    private func duplicate(_ connection: ConnectionProfile) {
+        var copied = connection
+        copied.id = UUID()
+        copied.name = "\(connection.name) copy"
+        copied.lastConnectedAt = nil
+        connectionStore.add(copied)
+        selectedId = copied.id
+    }
+
     private func importFromURI() {
         let uri = importURI.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !uri.isEmpty else { return }
@@ -212,23 +177,6 @@ struct ConnectionsListView: View {
         let profile = draft.build()
         connectionStore.add(profile)
         importURI = ""
-    }
-
-    private func quickConnect() {
-        let uri = importURI.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !uri.isEmpty else { return }
-
-        // Save as a connection first, then open window
-        let draft = ConnectionDraft(fromURI: uri)
-        let profile = draft.build()
-        connectionStore.add(profile)
-        importURI = ""
-
-        // Open database window, then hide Connections window
-        openWindow(value: profile.id)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            WindowCoordinator.shared.hideConnectionsWindow()
-        }
     }
 
     private func saveDraft(mode: EditorMode) {
@@ -246,6 +194,9 @@ struct ConnectionRow: View {
     let isSelected: Bool
     let onSelect: () -> Void
     let onConnect: () -> Void
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    let onDuplicate: () -> Void
     @State private var isHovered = false
 
     var body: some View {
@@ -269,20 +220,6 @@ struct ConnectionRow: View {
             }
 
             Spacer()
-
-            // Connect button
-            if isSelected {
-                Button("Connect", action: onConnect)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.white)
-                    .foregroundStyle(.black)
-                    .controlSize(.small)
-            } else {
-                Button("Connect", action: onConnect)
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .opacity(isHovered ? 1 : 0.6)
-            }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
@@ -294,5 +231,10 @@ struct ConnectionRow: View {
         .onHover { isHovered = $0 }
         .onTapGesture { onSelect() }
         .simultaneousGesture(TapGesture(count: 2).onEnded { onConnect() })
+        .contextMenu {
+            Button("Edit", action: onEdit)
+            Button("Delete", role: .destructive, action: onDelete)
+            Button("Duplicate", action: onDuplicate)
+        }
     }
 }

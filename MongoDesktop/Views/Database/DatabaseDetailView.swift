@@ -387,8 +387,7 @@ struct DocumentTableView: View {
             Table(rows, selection: $selection, columnCustomization: $columnCustomization) {
                 TableColumnForEach(columns, id: \.self) { key in
                     TableColumn(
-                        Text(key).bold() +
-                        Text(" \(typeString(for: key))").foregroundStyle(.secondary)
+                        Text("\(Text(key).bold()) \(Text(typeString(for: key)).foregroundStyle(.secondary))")
                     ) { row in
                         Text(displayValue(row.document[key], timeZone: globalSettings.displayTimeZone))
                             .lineLimit(1)
