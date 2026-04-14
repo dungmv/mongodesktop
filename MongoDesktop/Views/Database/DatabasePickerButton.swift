@@ -23,8 +23,8 @@ struct DatabasePickerButton: View {
                 databases: filtered,
                 selected: appState.selectedDatabase,
                 searchText: $searchText,
+                isPresented: $isPresented,
                 onSelect: { db in
-                    isPresented = false
                     appState.selectedDatabase = db
                     appState.selectedCollection = nil
                     Task { await appState.refreshCollections(database: db) }
@@ -40,7 +40,10 @@ struct DatabasePickerPopover: View {
     let databases: [String]
     let selected: String?
     @Binding var searchText: String
+    @Binding var isPresented: Bool
     let onSelect: (String) -> Void
+    
+    @State private var pendingDatabase: String? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -76,7 +79,10 @@ struct DatabasePickerPopover: View {
                             DatabasePickerRow(
                                 name: db,
                                 isSelected: selected == db,
-                                onTap: { onSelect(db) }
+                                onTap: { 
+                                    pendingDatabase = db
+                                    isPresented = false
+                                }
                             )
                         }
                     }
@@ -87,6 +93,11 @@ struct DatabasePickerPopover: View {
         }
         .frame(minWidth: 220)
         .background(.regularMaterial)
+        .onDisappear {
+            if let db = pendingDatabase {
+                onSelect(db)
+            }
+        }
     }
 }
 
