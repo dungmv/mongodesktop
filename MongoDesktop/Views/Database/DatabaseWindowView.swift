@@ -84,6 +84,15 @@ struct DatabaseWindowView: View {
     }
 
     private func openTab(database: String, collection: String) {
+        // 1. If a tab for this collection already exists, just switch to it
+        if let existingTab = tabs.first(where: { $0.state.databaseName == database && $0.state.collectionName == collection }) {
+            selectedTabId = existingTab.id
+            appState.selectedDatabase = database
+            appState.selectedCollection = collection
+            return
+        }
+
+        // 2. Otherwise, check if current tab is completely empty, and reuse it
         if let currentTabId = selectedTabId,
            let index = tabs.firstIndex(where: { $0.id == currentTabId }),
            tabs[index].state.collectionName == nil {

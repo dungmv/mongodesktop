@@ -675,11 +675,11 @@ struct WelcomeScreenView: View {
             
             VStack(spacing: 12) {
                 if let db = appState.selectedDatabase, !db.isEmpty {
-                    Text("Đang xem Database: \(db)")
+                    Text("Viewing Database: \(db)")
                         .font(.system(.largeTitle, design: .rounded, weight: .semibold))
                         .foregroundStyle(.primary)
                     
-                    Text("Hãy chọn một collection ở cột bên trái để tiếp tục")
+                    Text("Select a collection from the sidebar to continue")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -689,7 +689,7 @@ struct WelcomeScreenView: View {
                         .font(.system(.largeTitle, design: .rounded, weight: .semibold))
                         .foregroundStyle(.primary)
                     
-                    Text("Hãy chọn một database và collection để bắt đầu trải nghiệm")
+                    Text("Select a database and a collection to start exploring")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
