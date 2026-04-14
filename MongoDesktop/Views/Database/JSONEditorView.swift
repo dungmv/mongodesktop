@@ -123,7 +123,9 @@ struct JSONEditorView: NSViewRepresentable {
             refreshHighlight(in: textView)
             if forceValidation {
                 let validation = JSONEditorFormatter.validate(textView.string)
-                parent.errorMessage = validation?.message
+                DispatchQueue.main.async { [weak self] in
+                    self?.parent.errorMessage = validation?.message
+                }
             } else {
                 scheduleValidation(in: textView)
             }
