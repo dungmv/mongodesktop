@@ -121,8 +121,7 @@ actor MongoService {
     func listCollectionInfos(database: String) async throws -> [CollectionInfo] {
         let client = try requireClient()
         let command: BSONDocument = [
-            "listCollections": .int32(1),
-            "nameOnly": .bool(false)
+            "listCollections": .int32(1)
         ]
         let reply = try runCommand(client: client, database: database, command: command)
 
