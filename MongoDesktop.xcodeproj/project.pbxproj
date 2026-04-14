@@ -7,9 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5C3182DD2DBFF0D8004C59B0 /* SwiftBSON in Frameworks */ = {isa = PBXBuildFile; productRef = 5C3182DC2DBFF0D8004C59B0 /* SwiftBSON */; };
 		A1B2C3D42F00000100AAA001 /* SwiftTreeSitter in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D42F00000100AAA011 /* SwiftTreeSitter */; };
 		A1B2C3D42F00000100AAA002 /* TreeSitterJSON in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D42F00000100AAA012 /* TreeSitterJSON */; };
-		5C3182DD2DBFF0D8004C59B0 /* SwiftBSON in Frameworks */ = {isa = PBXBuildFile; productRef = 5C3182DC2DBFF0D8004C59B0 /* SwiftBSON */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -318,6 +318,8 @@
 					"/usr/local/opt/mongo-c-driver/include/mongoc-2.2.3",
 					"/usr/local/opt/mongo-c-driver/include/bson-2.2.3",
 				);
+				INFOPLIST_KEY_CFBundleDisplayName = "Mongo Desktop";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -369,6 +371,8 @@
 					"/usr/local/opt/mongo-c-driver/include/mongoc-2.2.3",
 					"/usr/local/opt/mongo-c-driver/include/bson-2.2.3",
 				);
+				INFOPLIST_KEY_CFBundleDisplayName = "Mongo Desktop";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -417,6 +421,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "swift-bson" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mongodb/swift-bson";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.1.0;
+			};
+		};
 		A1B2C3D42F00000100AAA021 /* XCRemoteSwiftPackageReference "swift-tree-sitter" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/tree-sitter/swift-tree-sitter";
@@ -433,17 +445,14 @@
 				minimumVersion = 0.24.0;
 			};
 		};
-		5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "swift-bson" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/mongodb/swift-bson";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 3.1.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		5C3182DC2DBFF0D8004C59B0 /* SwiftBSON */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "swift-bson" */;
+			productName = SwiftBSON;
+		};
 		A1B2C3D42F00000100AAA011 /* SwiftTreeSitter */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A1B2C3D42F00000100AAA021 /* XCRemoteSwiftPackageReference "swift-tree-sitter" */;
@@ -453,11 +462,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A1B2C3D42F00000100AAA022 /* XCRemoteSwiftPackageReference "tree-sitter-json" */;
 			productName = TreeSitterJSON;
-		};
-		5C3182DC2DBFF0D8004C59B0 /* SwiftBSON */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "swift-bson" */;
-			productName = SwiftBSON;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

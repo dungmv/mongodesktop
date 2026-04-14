@@ -20,11 +20,6 @@ struct DatabaseBrowserView: View {
                 .environmentObject(appState)
                 .environmentObject(tabState)
         }
-        .onChange(of: appState.selectedCollection) { _, newValue in
-            if let newValue, !newValue.isEmpty {
-                tabState.title = newValue
-            }
-        }
         .navigationSplitViewStyle(.balanced)
         .navigationTitle(appState.connectionName)
         .toolbar {
@@ -73,6 +68,7 @@ struct DatabaseBrowserView: View {
 struct CollectionSidebarView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var tabState: QueryTabState
+    @Environment(\.databaseTabContext) private var tabContext
     @State private var collectionFilterText = ""
 
     private var filteredCollections: [String] {
@@ -144,13 +140,16 @@ struct CollectionSidebarView: View {
                 List(filteredCollections, id: \.self, selection: $appState.selectedCollection) { col in
                     Label(col, systemImage: iconName(for: col))
                         .font(.system(.body, design: .rounded))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if let db = appState.selectedDatabase {
+                                tabContext?.open(db, col)
+                            }
+                        }
                 }
                 .listStyle(.sidebar)
                 .scrollContentBackground(.hidden)
-                .onChange(of: appState.selectedCollection) { _, _ in
-                    tabState.resetPaging()
-                    Task { await tabState.runFind(appState: appState) }
-                }
             }
         }
         .background(.ultraThinMaterial)

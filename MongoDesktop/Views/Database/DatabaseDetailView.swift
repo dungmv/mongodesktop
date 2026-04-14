@@ -224,27 +224,37 @@ struct DatabaseDetailView: View {
     }
 
     private func tabBar(_ context: DatabaseTabContext) -> some View {
-        ScrollView(.horizontal, showsIndicators: true) {
+        ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(context.tabs) { tab in
-                    TabPill(
-                        title: tab.title,
-                        isSelected: tab.id == context.selectedId,
-                        onSelect: { context.select(tab.id) },
-                        onClose: { context.close(tab.id) }
-                    )
+                // Track chứa các tabs
+                HStack(spacing: 0) {
+                    ForEach(context.tabs) { tab in
+                        TabPill(
+                            title: tab.title,
+                            isSelected: tab.id == context.selectedId,
+                            onSelect: { context.select(tab.id) },
+                            onClose: { context.close(tab.id) }
+                        )
+                    }
                 }
+                .padding(3)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(.regularMaterial) // "liquid glass" track
+                )
+                
+                // Nút cộng (+) ngoài track
                 Button(action: context.add) {
                     Image(systemName: "plus")
-                        .font(.caption.weight(.semibold))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(width: 22, height: 22)
-                        .background(Circle().fill(Color.secondary.opacity(0.12)))
+                        .frame(width: 28, height: 28)
+                        .background(Circle().fill(.regularMaterial))
                 }
                 .buttonStyle(.plain)
                 .help("New Tab")
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -260,34 +270,47 @@ private struct TabPill: View {
     let onSelect: () -> Void
     let onClose: () -> Void
 
+    @State private var isHovered = false
+
     var body: some View {
         HStack(spacing: 6) {
-            Button(action: onSelect) {
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(isSelected ? .primary : .secondary)
-                    .lineLimit(1)
-            }
-            .buttonStyle(.plain)
-
+            Text(title)
+                .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+                .foregroundStyle(isSelected ? .primary : .secondary)
+                .lineLimit(1)
+            
             Button(action: onClose) {
                 Image(systemName: "xmark")
-                    .font(.caption2.weight(.bold))
+                    .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 14, height: 14)
+                    .frame(width: 16, height: 16)
+                    .background(isHovered ? Color.primary.opacity(0.1) : Color.clear, in: Circle())
             }
             .buttonStyle(.plain)
+            .opacity(isHovered || isSelected ? 1 : 0)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
+        .frame(height: 26)
         .background(
-            Capsule(style: .continuous)
-                .fill(isSelected ? Color.primary.opacity(0.12) : Color.secondary.opacity(0.08))
+            ZStack {
+                if isSelected {
+                    Capsule(style: .continuous)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
+                } else if isHovered {
+                    Capsule(style: .continuous)
+                        .fill(Color.primary.opacity(0.05))
+                }
+            }
         )
-        .overlay(
-            Capsule(style: .continuous)
-                .stroke(Color.primary.opacity(isSelected ? 0.22 : 0.12), lineWidth: 1)
-        )
+        .contentShape(Capsule())
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .onTapGesture {
+            onSelect()
+        }
     }
 }
 

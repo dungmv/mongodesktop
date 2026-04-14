@@ -17,6 +17,7 @@ struct DatabaseTabContext {
     let select: (UUID) -> Void
     let close: (UUID) -> Void
     let add: () -> Void
+    let open: (String, String) -> Void
 }
 
 private struct DatabaseTabContextKey: EnvironmentKey {

@@ -6,6 +6,8 @@ import SwiftBSON
 @MainActor
 final class QueryTabState: ObservableObject {
     @Published var title: String = ""
+    @Published var databaseName: String?
+    @Published var collectionName: String?
     @Published var filterText: String = "{}"
     @Published var sortText: String = "{}"
     @Published var projectionText: String = "{}"
@@ -24,7 +26,15 @@ final class QueryTabState: ObservableObject {
     }
 
     func runFind(appState: AppState) async {
-        guard let db = appState.selectedDatabase, let collection = appState.selectedCollection else { return }
+        guard let db = databaseName ?? appState.selectedDatabase, 
+              let collection = collectionName ?? appState.selectedCollection else { return }
+        
+        // Ensure state is updated so tab displays correctly
+        await MainActor.run {
+            if self.databaseName == nil { self.databaseName = db }
+            if self.collectionName == nil { self.collectionName = collection }
+        }
+        
         await runFind(database: db, collection: collection, appState: appState)
     }
 

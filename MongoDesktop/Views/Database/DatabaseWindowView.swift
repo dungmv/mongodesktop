@@ -67,17 +67,33 @@ struct DatabaseWindowView: View {
 
     private func addTab() {
         let state = QueryTabState()
-        if let col = appState.selectedCollection, !col.isEmpty {
+        if let db = appState.selectedDatabase, let col = appState.selectedCollection, !col.isEmpty {
             state.title = col
+            state.databaseName = db
+            state.collectionName = col
         } else if let db = appState.selectedDatabase, !db.isEmpty {
             state.title = db
+            state.databaseName = db
         }
         let tab = DatabaseTab(id: UUID(), state: state)
         tabs.append(tab)
         selectedTabId = tab.id
-        if appState.selectedCollection != nil {
+        if state.collectionName != nil {
             Task { await state.runFind(appState: appState) }
         }
+    }
+
+    private func openTab(database: String, collection: String) {
+        let state = QueryTabState()
+        state.title = collection
+        state.databaseName = database
+        state.collectionName = collection
+        let tab = DatabaseTab(id: UUID(), state: state)
+        tabs.append(tab)
+        selectedTabId = tab.id
+        appState.selectedDatabase = database
+        appState.selectedCollection = collection
+        Task { await state.runFind(appState: appState) }
     }
 
     private func closeTab(_ id: UUID) {
@@ -110,18 +126,25 @@ struct DatabaseWindowView: View {
             select: { id in
                 selectedTabId = id
                 if let tab = tabs.first(where: { $0.id == id }) {
-                    Task { await tab.state.runFind(appState: appState) }
+                    // Cập nhật lại AppState selection để UI sidebar đồng bộ (nếu muốn)
+                    if let db = tab.state.databaseName {
+                        appState.selectedDatabase = db
+                    }
+                    if let col = tab.state.collectionName {
+                        appState.selectedCollection = col
+                    }
                 }
             },
             close: closeTab,
-            add: addTab
+            add: addTab,
+            open: openTab
         )
     }
 
     private func tabTitle(for state: QueryTabState, fallbackIndex: Int) -> String {
         if !state.title.isEmpty { return state.title }
-        if let col = appState.selectedCollection, !col.isEmpty { return col }
-        if let db = appState.selectedDatabase, !db.isEmpty { return db }
+        if let col = state.collectionName, !col.isEmpty { return col }
+        if let db = state.databaseName, !db.isEmpty { return db }
         return "Tab \(fallbackIndex)"
     }
 
