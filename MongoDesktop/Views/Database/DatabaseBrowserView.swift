@@ -137,10 +137,18 @@ struct CollectionSidebarView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(filteredCollections, id: \.self, selection: $appState.selectedCollection) { col in
+                List(filteredCollections, id: \.self) { col in
+                    let isSelected = col == appState.selectedCollection
                     Label(col, systemImage: iconName(for: col))
                         .font(.system(.body, design: .rounded))
+                        .foregroundStyle(isSelected ? .white : .primary)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 8)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(isSelected ? Color.accentColor : Color.clear)
+                        )
                         .contentShape(Rectangle())
                         .onTapGesture {
                             if let db = appState.selectedDatabase {

@@ -84,16 +84,30 @@ struct DatabaseWindowView: View {
     }
 
     private func openTab(database: String, collection: String) {
-        let state = QueryTabState()
-        state.title = collection
-        state.databaseName = database
-        state.collectionName = collection
-        let tab = DatabaseTab(id: UUID(), state: state)
-        tabs.append(tab)
-        selectedTabId = tab.id
-        appState.selectedDatabase = database
-        appState.selectedCollection = collection
-        Task { await state.runFind(appState: appState) }
+        if let currentTabId = selectedTabId,
+           let index = tabs.firstIndex(where: { $0.id == currentTabId }),
+           tabs[index].state.collectionName == nil {
+            
+            let state = tabs[index].state
+            state.title = collection
+            state.databaseName = database
+            state.collectionName = collection
+            appState.selectedDatabase = database
+            appState.selectedCollection = collection
+            Task { await state.runFind(appState: appState) }
+            
+        } else {
+            let state = QueryTabState()
+            state.title = collection
+            state.databaseName = database
+            state.collectionName = collection
+            let tab = DatabaseTab(id: UUID(), state: state)
+            tabs.append(tab)
+            selectedTabId = tab.id
+            appState.selectedDatabase = database
+            appState.selectedCollection = collection
+            Task { await state.runFind(appState: appState) }
+        }
     }
 
     private func closeTab(_ id: UUID) {

@@ -102,7 +102,7 @@ final class AppState: ObservableObject {
             await MainActor.run {
                 collections = list
                 timeSeriesCollections = timeSeries
-                if selectedCollection == nil { selectedCollection = list.first }
+                // Avoid auto-selecting the first collection so the Welcome Screen stays visible
             }
         } catch {
             await MainActor.run { lastError = error.localizedDescription }

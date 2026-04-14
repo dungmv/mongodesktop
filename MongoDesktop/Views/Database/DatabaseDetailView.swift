@@ -12,7 +12,6 @@ struct DatabaseDetailView: View {
     @State private var filterError: String? = nil
     @State private var sortError: String? = nil
     @State private var projectionError: String? = nil
-
     var body: some View {
         VStack(spacing: 0) {
             if let tabContext {
@@ -20,10 +19,15 @@ struct DatabaseDetailView: View {
                     tabBar(tabContext)
                 }
             }
-            toolbarArea
-            Divider()
-                .opacity(0.4)
-            contentArea
+            
+            if appState.selectedDatabase == nil || appState.selectedCollection == nil {
+                WelcomeScreenView()
+            } else {
+                toolbarArea
+                Divider()
+                    .opacity(0.4)
+                contentArea
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial)
@@ -192,17 +196,7 @@ struct DatabaseDetailView: View {
     // MARK: Content Area
     private var contentArea: some View {
         Group {
-            if appState.selectedDatabase == nil || appState.selectedCollection == nil {
-                VStack {
-                    ContentUnavailableView(
-                        "Chọn một collection",
-                        systemImage: "tablecells",
-                        description: Text("Chọn database và collection từ sidebar để xem documents.")
-                    )
-                    .padding(.top, 40)
-                    Spacer()
-                }
-            } else if tabState.viewMode == .table {
+            if tabState.viewMode == .table {
                 DocumentTableView(documents: tabState.documents, selection: $tabState.selectedRowIds)
             } else {
                 DocumentJSONView(documents: tabState.documents, timeZone: globalSettings.displayTimeZone)
@@ -640,5 +634,80 @@ struct JSONNodeView: View {
             return .orange
         default: return .primary
         }
+    }
+}
+
+// MARK: - WelcomeScreenView
+
+struct WelcomeScreenView: View {
+    @EnvironmentObject private var appState: AppState
+    @State private var isAnimating = false
+
+    var body: some View {
+        VStack(spacing: 24) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.green.opacity(isAnimating ? 0.3 : 0.15), Color.mint.opacity(isAnimating ? 0.15 : 0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 160, height: 160)
+                    .scaleEffect(isAnimating ? 1.05 : 0.95)
+                    .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: isAnimating)
+                
+                Image(systemName: "leaf.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 60, height: 60)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.green, .mint],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .shadow(color: .green.opacity(0.4), radius: 12, y: 6)
+            }
+            .onAppear { isAnimating = true }
+            
+            VStack(spacing: 12) {
+                if let db = appState.selectedDatabase, !db.isEmpty {
+                    Text("Đang xem Database: \(db)")
+                        .font(.system(.largeTitle, design: .rounded, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    
+                    Text("Hãy chọn một collection ở cột bên trái để tiếp tục")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                } else {
+                    Text("Welcome to MongoDesktop")
+                        .font(.system(.largeTitle, design: .rounded, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    
+                    Text("Hãy chọn một database và collection để bắt đầu trải nghiệm")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            ZStack {
+                Color.clear
+                RadialGradient(
+                    gradient: Gradient(colors: [Color.green.opacity(0.05), Color.clear]),
+                    center: .center,
+                    startRadius: 50,
+                    endRadius: 400
+                )
+            }
+        )
     }
 }

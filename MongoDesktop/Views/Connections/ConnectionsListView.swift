@@ -56,6 +56,12 @@ struct ConnectionsListView: View {
             Divider().padding(.horizontal, 16)
 
             Spacer()
+
+            // Credit dungmv
+            Text("Credit by dungmv")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .padding(.bottom, 12)
         }
         .frame(minWidth: 180, idealWidth: 200)
         .background(.ultraThinMaterial)
