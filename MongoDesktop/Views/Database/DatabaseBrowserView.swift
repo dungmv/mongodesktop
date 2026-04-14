@@ -84,6 +84,22 @@ struct CollectionSidebarView: View {
         return "tablecells"
     }
 
+    private var selectedCollectionBinding: Binding<String?> {
+        Binding(
+            get: { appState.selectedCollection },
+            set: { newValue in
+                DispatchQueue.main.async {
+                    if appState.selectedCollection != newValue {
+                        appState.selectedCollection = newValue
+                        if let db = appState.selectedDatabase, let col = newValue {
+                            tabContext?.open(db, col)
+                        }
+                    }
+                }
+            }
+        )
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
@@ -137,16 +153,11 @@ struct CollectionSidebarView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(filteredCollections, id: \.self, selection: $appState.selectedCollection) { col in
+                List(filteredCollections, id: \.self, selection: selectedCollectionBinding) { col in
                     Label(col, systemImage: iconName(for: col))
                         .font(.system(.body, design: .rounded))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
-                        .onTapGesture {
-                            if let db = appState.selectedDatabase {
-                                tabContext?.open(db, col)
-                            }
-                        }
                 }
                 .listStyle(.sidebar)
                 .scrollContentBackground(.hidden)

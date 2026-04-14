@@ -62,7 +62,9 @@ struct DatabaseWindowView: View {
 
     private func ensureInitialTab() {
         guard tabs.isEmpty else { return }
-        addTab()
+        DispatchQueue.main.async {
+            self.addTab()
+        }
     }
 
     private func addTab() {

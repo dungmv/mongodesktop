@@ -18,37 +18,33 @@ final class AppState: ObservableObject {
     @Published var serverVersion: String = ""
 
     func connect(using connection: ConnectionProfile, store: ConnectionStore) {
-        isLoading = true
-        lastError = nil
-        statusMessage = "Đang kết nối..."
-        connectionName = connection.name
-        selectedConnectionId = connection.id
-        if !connection.database.isEmpty {
-            selectedDatabase = connection.database
-        } else {
-            selectedDatabase = nil
-        }
-        selectedCollection = nil
-
-        Task {
+        Task { @MainActor in
+            isLoading = true
+            lastError = nil
+            statusMessage = "Đang kết nối..."
+            connectionName = connection.name
+            selectedConnectionId = connection.id
+            if !connection.database.isEmpty {
+                selectedDatabase = connection.database
+            } else {
+                selectedDatabase = nil
+            }
+            selectedCollection = nil
+            
             do {
                 try await MongoService.shared.connect(uri: connection.connectionString)
-                await MainActor.run {
-                    isConnected = true
-                    statusMessage = "Đã kết nối: \(connection.name)"
-                    store.markConnected(connection.id)
-                }
+                isConnected = true
+                statusMessage = "Đã kết nối: \(connection.name)"
+                store.markConnected(connection.id)
                 async let versionFetch: () = fetchServerVersion()
                 await refreshDatabases()
                 await versionFetch
             } catch {
-                await MainActor.run {
-                    isConnected = false
-                    statusMessage = "Kết nối thất bại"
-                    lastError = error.localizedDescription
-                }
+                isConnected = false
+                statusMessage = "Kết nối thất bại"
+                lastError = error.localizedDescription
             }
-            await MainActor.run { isLoading = false }
+            isLoading = false
         }
     }
 

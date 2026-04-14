@@ -95,7 +95,9 @@ struct DatabasePickerPopover: View {
         .background(.regularMaterial)
         .onDisappear {
             if let db = pendingDatabase {
-                onSelect(db)
+                DispatchQueue.main.async {
+                    onSelect(db)
+                }
             }
         }
     }
