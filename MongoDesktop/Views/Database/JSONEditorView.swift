@@ -122,8 +122,9 @@ struct JSONEditorView: NSViewRepresentable {
         fileprivate func refresh(in textView: JSONTextView, forceValidation: Bool) {
             refreshHighlight(in: textView)
             if forceValidation {
-                let validation = JSONEditorFormatter.validate(textView.string)
-                DispatchQueue.main.async { [weak self] in
+                let source = textView.string
+                Task { @MainActor [weak self] in
+                    let validation = JSONEditorFormatter.validate(source)
                     self?.parent.errorMessage = validation?.message
                 }
             } else {
@@ -141,8 +142,8 @@ struct JSONEditorView: NSViewRepresentable {
             let task = DispatchWorkItem { [weak self] in
                 guard let self else { return }
                 let validation = JSONEditorFormatter.validate(source)
-                DispatchQueue.main.async {
-                    self.parent.errorMessage = validation?.message
+                Task { @MainActor [weak self] in
+                    self?.parent.errorMessage = validation?.message
                 }
             }
             validateWorkItem = task
