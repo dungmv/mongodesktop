@@ -12,6 +12,7 @@ struct DatabaseDetailView: View {
     @State private var filterError: String? = nil
     @State private var sortError: String? = nil
     @State private var projectionError: String? = nil
+    @State private var localViewMode: DocumentViewMode = .json
     var body: some View {
         VStack(spacing: 0) {
             if let tabContext {
@@ -31,6 +32,19 @@ struct DatabaseDetailView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial)
+        .onAppear {
+            localViewMode = tabState.viewMode
+        }
+        .onChange(of: tabState.viewMode) { _, newValue in
+            guard localViewMode != newValue else { return }
+            localViewMode = newValue
+        }
+        .onChange(of: localViewMode) { _, newValue in
+            guard tabState.viewMode != newValue else { return }
+            DispatchQueue.main.async {
+                tabState.viewMode = newValue
+            }
+        }
     }
 
     // MARK: Toolbar Area
@@ -140,7 +154,7 @@ struct DatabaseDetailView: View {
 
     // MARK: View Mode Picker
     private var viewModePicker: some View {
-        Picker("", selection: $tabState.viewMode) {
+        Picker("", selection: $localViewMode) {
             ForEach(DocumentViewMode.allCases) { mode in
                 Image(systemName: mode == .table ? "tablecells" : "curlybraces")
                     .tag(mode)
@@ -196,7 +210,7 @@ struct DatabaseDetailView: View {
     // MARK: Content Area
     private var contentArea: some View {
         Group {
-            if tabState.viewMode == .table {
+            if localViewMode == .table {
                 DocumentTableView(documents: tabState.documents, selection: $tabState.selectedRowIds, isLoading: tabState.isLoading)
             } else {
                 DocumentJSONView(documents: tabState.documents, timeZone: globalSettings.displayTimeZone, isLoading: tabState.isLoading)
@@ -329,6 +343,7 @@ struct DocumentRow: Identifiable {
 struct DocumentTableView: View {
     @EnvironmentObject private var globalSettings: GlobalSettings
     @State private var columnCustomization = TableColumnCustomization<DocumentRow>()
+    @State private var localSelection: Set<String> = []
     let rows: [DocumentRow]
     @Binding var selection: Set<String>
     let isLoading: Bool
@@ -411,7 +426,7 @@ struct DocumentTableView: View {
                 Spacer()
             }
         } else {
-            Table(rows, selection: $selection, columnCustomization: $columnCustomization) {
+            Table(rows, selection: $localSelection, columnCustomization: $columnCustomization) {
                 TableColumnForEach(columns, id: \.self) { key in
                     TableColumn(
                         Text("\(Text(key).bold()) \(Text(typeString(for: key)).foregroundStyle(.secondary))")
@@ -425,6 +440,32 @@ struct DocumentTableView: View {
             }
             .tableStyle(.inset(alternatesRowBackgrounds: true))
             .id(columns)
+            .onAppear {
+                localSelection = selection.intersection(Set(rows.map(\.id)))
+            }
+            .onChange(of: selection) { _, newValue in
+                let normalized = newValue.intersection(Set(rows.map(\.id)))
+                guard localSelection != normalized else { return }
+                localSelection = normalized
+            }
+            .onChange(of: rows.map(\.id)) { _, rowIds in
+                let validIds = Set(rowIds)
+                let normalizedLocal = localSelection.intersection(validIds)
+                if localSelection != normalizedLocal {
+                    localSelection = normalizedLocal
+                }
+                if selection != normalizedLocal {
+                    DispatchQueue.main.async {
+                        selection = normalizedLocal
+                    }
+                }
+            }
+            .onChange(of: localSelection) { _, newValue in
+                guard selection != newValue else { return }
+                DispatchQueue.main.async {
+                    selection = newValue
+                }
+            }
             .overlay {
                 if isLoading {
                     VStack {
