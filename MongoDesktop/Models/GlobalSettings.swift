@@ -2,6 +2,7 @@ import Foundation
 
 // MARK: - GlobalSettings (shared across windows)
 
+@MainActor
 final class GlobalSettings: ObservableObject {
     static let shared = GlobalSettings()
 

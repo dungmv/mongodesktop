@@ -50,60 +50,55 @@ final class AppState: ObservableObject {
 
     func disconnect() async throws {
         try await MongoService.shared.disconnect()
-        await MainActor.run {
-            isConnected = false
-            statusMessage = "Đã ngắt kết nối"
-            databases = []
-            collections = []
-            timeSeriesCollections = []
-            selectedDatabase = nil
-            selectedCollection = nil
-            serverVersion = ""
-        }
+        isConnected = false
+        statusMessage = "Đã ngắt kết nối"
+        databases = []
+        collections = []
+        timeSeriesCollections = []
+        selectedDatabase = nil
+        selectedCollection = nil
+        serverVersion = ""
     }
 
     func fetchServerVersion() async {
         do {
             let version = try await MongoService.shared.serverVersion()
-            await MainActor.run { serverVersion = version }
+            serverVersion = version
         } catch {
             // Non-critical
         }
     }
 
     func refreshDatabases() async {
-        await MainActor.run { isLoading = true; lastError = nil }
+        isLoading = true
+        lastError = nil
         do {
             let list = try await MongoService.shared.listDatabases()
-            await MainActor.run {
-                databases = list
-                if let selected = selectedDatabase, !list.contains(selected) {
-                    selectedDatabase = nil
-                }
-                if selectedDatabase == nil { selectedDatabase = list.first }
+            databases = list
+            if let selected = selectedDatabase, !list.contains(selected) {
+                selectedDatabase = nil
             }
+            if selectedDatabase == nil { selectedDatabase = list.first }
         } catch {
-            await MainActor.run { lastError = error.localizedDescription }
+            lastError = error.localizedDescription
         }
-        await MainActor.run { isLoading = false }
+        isLoading = false
         if let db = selectedDatabase { await refreshCollections(database: db) }
     }
 
     func refreshCollections(database: String) async {
-        await MainActor.run { isLoading = true; lastError = nil }
+        isLoading = true
+        lastError = nil
         do {
             let infos = try await MongoService.shared.listCollectionInfos(database: database)
             let list = infos.map(\.name)
             let timeSeries = Set(infos.filter(\.isTimeSeries).map(\.name))
-            await MainActor.run {
-                collections = list
-                timeSeriesCollections = timeSeries
-                // Avoid auto-selecting the first collection so the Welcome Screen stays visible
-            }
+            collections = list
+            timeSeriesCollections = timeSeries
         } catch {
-            await MainActor.run { lastError = error.localizedDescription }
+            lastError = error.localizedDescription
         }
-        await MainActor.run { isLoading = false }
+        isLoading = false
     }
 }
 

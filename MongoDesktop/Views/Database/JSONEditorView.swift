@@ -52,8 +52,13 @@ struct JSONEditorView: NSViewRepresentable {
         guard let textView = nsView.documentView as? JSONTextView else { return }
         context.coordinator.parent = self
         if textView.string != text {
+            context.coordinator.isUpdating = true
             textView.string = text
-            context.coordinator.refresh(in: textView, forceValidation: true)
+            // Highlight synchronously (suppressed from textDidChange via isUpdating)
+            context.coordinator.applyHighlight(in: textView)
+            context.coordinator.isUpdating = false
+            // Defer validation completely out of the SwiftUI render cycle
+            context.coordinator.scheduleValidationDeferred(in: textView)
         }
     }
 
@@ -61,6 +66,10 @@ struct JSONEditorView: NSViewRepresentable {
         var parent: JSONEditorView
         private let highlighter = JSONSyntaxHighlighter()
         private var validateWorkItem: DispatchWorkItem?
+        /// Set to true when we are programmatically mutating the text view so that
+        /// `textDidChange` does not write back to the @Binding (which would publish
+        /// a state change inside a SwiftUI view-update and trigger the warning).
+        var isUpdating: Bool = false
         private let autoPairs: [String: String] = [
             "\"": "\"",
             "{": "}",
@@ -74,13 +83,15 @@ struct JSONEditorView: NSViewRepresentable {
         }
 
         func textDidChange(_ notification: Notification) {
+            // Ignore notifications we caused ourselves during programmatic updates.
+            guard !isUpdating else { return }
             guard let textView = notification.object as? JSONTextView else { return }
             let current = textView.string
             if parent.text != current {
                 parent.text = current
             }
 
-            refreshHighlight(in: textView)
+            applyHighlight(in: textView)
             scheduleValidation(in: textView)
         }
 
@@ -119,30 +130,42 @@ struct JSONEditorView: NSViewRepresentable {
             return false
         }
 
+        // Called from makeNSView: apply highlight and schedule initial validation.
         fileprivate func refresh(in textView: JSONTextView, forceValidation: Bool) {
-            refreshHighlight(in: textView)
+            applyHighlight(in: textView)
             if forceValidation {
-                let source = textView.string
-                Task { @MainActor [weak self] in
-                    let validation = JSONEditorFormatter.validate(source)
-                    self?.parent.errorMessage = validation?.message
-                }
+                scheduleValidationDeferred(in: textView)
             } else {
                 scheduleValidation(in: textView)
             }
         }
 
-        private func refreshHighlight(in textView: JSONTextView) {
+        // Applies syntax highlight while suppressing any textDidChange side-effects.
+        fileprivate func applyHighlight(in textView: JSONTextView) {
+            isUpdating = true
             highlighter.apply(to: textView, source: textView.string)
+            isUpdating = false
         }
 
+        // Validates after a true runloop hop so we never mutate @Binding during a
+        // SwiftUI render pass (DispatchQueue.main.async guarantees a new runloop turn).
+        fileprivate func scheduleValidationDeferred(in textView: JSONTextView) {
+            let source = textView.string
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                let validation = JSONEditorFormatter.validate(source)
+                self.parent.errorMessage = validation?.message
+            }
+        }
+
+        // Debounced validation for user typing (runs on background then hops to main).
         private func scheduleValidation(in textView: JSONTextView) {
             validateWorkItem?.cancel()
             let source = textView.string
             let task = DispatchWorkItem { [weak self] in
                 guard let self else { return }
                 let validation = JSONEditorFormatter.validate(source)
-                Task { @MainActor [weak self] in
+                DispatchQueue.main.async { [weak self] in
                     self?.parent.errorMessage = validation?.message
                 }
             }

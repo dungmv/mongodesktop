@@ -26,21 +26,19 @@ final class QueryTabState: ObservableObject {
     }
 
     func runFind(appState: AppState) async {
-        guard let db = databaseName ?? appState.selectedDatabase, 
+        guard let db = databaseName ?? appState.selectedDatabase,
               let collection = collectionName ?? appState.selectedCollection else { return }
-        
-        // Ensure state is updated so tab displays correctly
-        await MainActor.run {
-            if self.databaseName == nil { self.databaseName = db }
-            if self.collectionName == nil { self.collectionName = collection }
-        }
-        
+        // Ensure state is so tab displays correctly
+        if self.databaseName == nil { self.databaseName = db }
+        if self.collectionName == nil { self.collectionName = collection }
         await runFind(database: db, collection: collection, appState: appState)
     }
 
     func runFind(database: String, collection: String, appState: AppState) async {
-        await MainActor.run { isLoading = true; appState.lastError = nil; lastQueryDuration = nil }
-        await MainActor.run { title = collection }
+        isLoading = true
+        title = collection
+        appState.lastError = nil
+        lastQueryDuration = nil
         let start = Date()
         do {
             let filter = try parseFilter(filterText)
@@ -53,16 +51,15 @@ final class QueryTabState: ObservableObject {
                 limit: pageSize, skip: skip
             )
             let elapsed = Date().timeIntervalSince(start)
-            await MainActor.run {
-                documents = docs
-                hasMore = docs.count == pageSize
-                selectedRowIds = []
-                lastQueryDuration = elapsed
-            }
+            documents = docs
+            hasMore = docs.count == pageSize
+            selectedRowIds = []
+            lastQueryDuration = elapsed
+            isLoading = false
         } catch {
-            await MainActor.run { appState.lastError = error.localizedDescription }
+            appState.lastError = error.localizedDescription
+            isLoading = false
         }
-        await MainActor.run { isLoading = false }
     }
 
     func nextPage(appState: AppState) async {
