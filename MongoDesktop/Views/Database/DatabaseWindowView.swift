@@ -81,6 +81,8 @@ struct DatabaseWindowView: View {
         tabs.append(tab)
         selectedTabId = tab.id
         if state.collectionName != nil {
+            state.isLoading = true
+            state.documents = []
             Task { await state.runFind(appState: appState) }
         }
     }
@@ -105,6 +107,8 @@ struct DatabaseWindowView: View {
             state.collectionName = collection
             appState.selectedDatabase = database
             appState.selectedCollection = collection
+            state.isLoading = true
+            state.documents = []
             Task { await state.runFind(appState: appState) }
             
         } else {
@@ -112,6 +116,8 @@ struct DatabaseWindowView: View {
             state.title = collection
             state.databaseName = database
             state.collectionName = collection
+            state.isLoading = true
+            state.documents = []
             let tab = DatabaseTab(id: UUID(), state: state)
             tabs.append(tab)
             selectedTabId = tab.id

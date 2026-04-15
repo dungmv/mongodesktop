@@ -197,9 +197,9 @@ struct DatabaseDetailView: View {
     private var contentArea: some View {
         Group {
             if tabState.viewMode == .table {
-                DocumentTableView(documents: tabState.documents, selection: $tabState.selectedRowIds)
+                DocumentTableView(documents: tabState.documents, selection: $tabState.selectedRowIds, isLoading: tabState.isLoading)
             } else {
-                DocumentJSONView(documents: tabState.documents, timeZone: globalSettings.displayTimeZone)
+                DocumentJSONView(documents: tabState.documents, timeZone: globalSettings.displayTimeZone, isLoading: tabState.isLoading)
             }
         }
     }
@@ -331,12 +331,14 @@ struct DocumentTableView: View {
     @State private var columnCustomization = TableColumnCustomization<DocumentRow>()
     let rows: [DocumentRow]
     @Binding var selection: Set<String>
+    let isLoading: Bool
 
-    init(documents: [BSONDocument], selection: Binding<Set<String>>) {
+    init(documents: [BSONDocument], selection: Binding<Set<String>>, isLoading: Bool) {
         self.rows = documents.enumerated().map { index, doc in
             DocumentRow(document: doc, fallbackIndex: index)
         }
         self._selection = selection
+        self.isLoading = isLoading
     }
 
     private var columns: [String] {
@@ -390,7 +392,15 @@ struct DocumentTableView: View {
     }
 
     var body: some View {
-        if columns.isEmpty {
+        if isLoading && columns.isEmpty {
+            VStack(spacing: 12) {
+                ProgressView()
+                    .controlSize(.regular)
+                Text("Loading...")
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if columns.isEmpty {
             VStack {
                 ContentUnavailableView(
                     "Không có document",
@@ -415,6 +425,16 @@ struct DocumentTableView: View {
             }
             .tableStyle(.inset(alternatesRowBackgrounds: true))
             .id(columns)
+            .overlay {
+                if isLoading {
+                    VStack {
+                        ProgressView()
+                            .controlSize(.regular)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.ultraThinMaterial.opacity(0.3))
+                }
+            }
         }
     }
 
@@ -466,9 +486,18 @@ fileprivate func displayValue(_ value: BSON?, timeZone: TimeZone) -> String {
 struct DocumentJSONView: View {
     let documents: [BSONDocument]
     let timeZone: TimeZone
+    let isLoading: Bool
 
     var body: some View {
-        if documents.isEmpty {
+        if isLoading && documents.isEmpty {
+            VStack(spacing: 12) {
+                ProgressView()
+                    .controlSize(.regular)
+                Text("Loading...")
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if documents.isEmpty {
             VStack {
                 ContentUnavailableView(
                     "Không có document",
@@ -486,6 +515,16 @@ struct DocumentJSONView: View {
                     }
                 }
                 .padding(16)
+            }
+            .overlay {
+                if isLoading {
+                    VStack {
+                        ProgressView()
+                            .controlSize(.regular)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.ultraThinMaterial.opacity(0.3))
+                }
             }
         }
     }
