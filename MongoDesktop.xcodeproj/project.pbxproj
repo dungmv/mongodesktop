@@ -311,12 +311,12 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "$(inherited)";
 				"HEADER_SEARCH_PATHS[arch=arm64]" = (
-					"/opt/homebrew/opt/mongo-c-driver/include/mongoc-2.2.3",
-					"/opt/homebrew/opt/mongo-c-driver/include/bson-2.2.3",
+					"/opt/homebrew/opt/mongo-c-driver/include/mongoc-2.2.4",
+					"/opt/homebrew/opt/mongo-c-driver/include/bson-2.2.4",
 				);
 				"HEADER_SEARCH_PATHS[arch=x86_64]" = (
-					"/usr/local/opt/mongo-c-driver/include/mongoc-2.2.3",
-					"/usr/local/opt/mongo-c-driver/include/bson-2.2.3",
+					"/usr/local/opt/mongo-c-driver/include/mongoc-2.2.4",
+					"/usr/local/opt/mongo-c-driver/include/bson-2.2.4",
 				);
 				INFOPLIST_KEY_CFBundleDisplayName = "Mongo Desktop";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -364,12 +364,12 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "$(inherited)";
 				"HEADER_SEARCH_PATHS[arch=arm64]" = (
-					"/opt/homebrew/opt/mongo-c-driver/include/mongoc-2.2.3",
-					"/opt/homebrew/opt/mongo-c-driver/include/bson-2.2.3",
+					"/opt/homebrew/opt/mongo-c-driver/include/mongoc-2.2.4",
+					"/opt/homebrew/opt/mongo-c-driver/include/bson-2.2.4",
 				);
 				"HEADER_SEARCH_PATHS[arch=x86_64]" = (
-					"/usr/local/opt/mongo-c-driver/include/mongoc-2.2.3",
-					"/usr/local/opt/mongo-c-driver/include/bson-2.2.3",
+					"/usr/local/opt/mongo-c-driver/include/mongoc-2.2.4",
+					"/usr/local/opt/mongo-c-driver/include/bson-2.2.4",
 				);
 				INFOPLIST_KEY_CFBundleDisplayName = "Mongo Desktop";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
