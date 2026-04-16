@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import SwiftBSON
 
 struct CollectionInfo {
@@ -13,6 +14,8 @@ actor MongoService {
     private var connectedURI: String?
 
     private static let initialized: Void = {
+        // Prefer TCP for SRV lookups to avoid resolver/network paths that drop UDP DNS responses.
+        setenv("MONGOC_EXPERIMENTAL_SRV_PREFER_TCP", "true", 0)
         mongoc_init()
 #if DEBUG
         let version = String(cString: mongoc_get_version())
@@ -335,99 +338,9 @@ actor MongoService {
         guard let client = mongoc_client_new_from_uri_with_error(parsed, &createError) else {
             let msg = errorMessage(createError)
             let detail = msg.isEmpty ? "Không thể khởi tạo Mongo client." : "Không thể khởi tạo Mongo client: \(msg)"
-            if uri.lowercased().hasPrefix("mongodb+srv://"),
-               msg.contains("Failed to look up SRV record") || (createError.domain == 2 && createError.code == 3) {
-                if let fallback = await buildFallbackURIFromSRV(uri: uri) {
-                    let fallbackClient = try await createClient(uri: fallback)
-                    return fallbackClient
-                }
-            }
             throw MongoServiceError.connectionFailed("\(detail)\nURI: \(redactedURI(uri))\nDomain: \(createError.domain)  Code: \(createError.code)")
         }
         return client
-    }
-
-    private func buildFallbackURIFromSRV(uri: String) async -> String? {
-        guard let base = parseMongoURI(uri) else { return nil }
-        let (records, txt) = await DNSDebugService.resolveSRVAndTXT(host: base.host)
-        if records.isEmpty { return nil }
-
-        let hosts = records.map { "\($0.target):\($0.port)" }.joined(separator: ",")
-        var query: [String: String] = base.queryItems
-
-        for (k, v) in txt.items {
-            if query[k] == nil { query[k] = v }
-        }
-
-        if query["tls"] == nil && query["ssl"] == nil {
-            query["tls"] = "true"
-        }
-
-        var uriParts = "mongodb://"
-        if let user = base.username, !user.isEmpty {
-            let u = percentEncode(user)
-            uriParts += u
-            if let pass = base.password, !pass.isEmpty {
-                uriParts += ":\(percentEncode(pass))"
-            }
-            uriParts += "@"
-        }
-        uriParts += hosts
-
-        if let db = base.database, !db.isEmpty {
-            uriParts += "/\(db)"
-        }
-
-        if !query.isEmpty {
-            let items = query.map { key, value in
-                "\(key)=\(value)"
-            }.sorted()
-            uriParts += "?" + items.joined(separator: "&")
-        }
-
-        return uriParts
-    }
-
-    private struct ParsedMongoURI {
-        let host: String
-        let username: String?
-        let password: String?
-        let database: String?
-        let queryItems: [String: String]
-    }
-
-    private func parseMongoURI(_ uri: String) -> ParsedMongoURI? {
-        var httpURI = uri.trimmingCharacters(in: .whitespacesAndNewlines)
-        if httpURI.hasPrefix("mongodb+srv://") {
-            httpURI = "http://" + httpURI.dropFirst("mongodb+srv://".count)
-        } else if httpURI.hasPrefix("mongodb://") {
-            httpURI = "http://" + httpURI.dropFirst("mongodb://".count)
-        }
-        guard let components = URLComponents(string: httpURI),
-              let host = components.host, !host.isEmpty else { return nil }
-
-        let db = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        var query: [String: String] = [:]
-        if let items = components.queryItems {
-            for item in items {
-                if let value = item.value, !value.isEmpty {
-                    query[item.name] = value
-                }
-            }
-        }
-
-        return ParsedMongoURI(
-            host: host,
-            username: components.user,
-            password: components.password,
-            database: db.isEmpty ? nil : db,
-            queryItems: query
-        )
-    }
-
-    private func percentEncode(_ value: String) -> String {
-        let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
-        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
     }
 
     private func bsonFromJSON(_ json: String) throws -> UnsafeMutablePointer<bson_t> {

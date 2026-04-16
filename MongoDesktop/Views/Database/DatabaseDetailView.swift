@@ -25,8 +25,7 @@ struct DatabaseDetailView: View {
                 WelcomeScreenView()
             } else {
                 toolbarArea
-                Divider()
-                    .opacity(0.4)
+                Divider().opacity(0.4)
                 contentArea
             }
         }
