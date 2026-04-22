@@ -43,6 +43,14 @@ struct ConnectionProfile: Identifiable, Codable, Hashable {
     }
 
     var connectionString: String {
+        return buildURI(maskPassword: false)
+    }
+
+    var displayConnectionString: String {
+        return buildURI(maskPassword: true)
+    }
+
+    private func buildURI(maskPassword: Bool) -> String {
         let scheme = useSRV ? "mongodb+srv" : "mongodb"
         var uri = "\(scheme)://"
 
@@ -50,8 +58,12 @@ struct ConnectionProfile: Identifiable, Codable, Hashable {
             let user = ConnectionProfile.percentEncode(username)
             uri += user
             if !password.isEmpty {
-                let pass = ConnectionProfile.percentEncode(password)
-                uri += ":\(pass)"
+                if maskPassword {
+                    uri += ":***"
+                } else {
+                    let pass = ConnectionProfile.percentEncode(password)
+                    uri += ":\(pass)"
+                }
             }
             uri += "@"
         }

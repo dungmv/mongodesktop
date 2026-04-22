@@ -378,7 +378,7 @@ actor MongoService {
         let hostAndPath = rest[atIndex...]
         if let colonIndex = userInfo.firstIndex(of: ":") {
             let user = userInfo[..<colonIndex]
-            return "\(scheme)\(user):******\(hostAndPath)"
+            return "\(scheme)\(user):***\(hostAndPath)"
         }
         return "\(scheme)\(userInfo)\(hostAndPath)"
     }

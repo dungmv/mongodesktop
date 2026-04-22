@@ -239,7 +239,7 @@ private struct DatabaseTabContentView: View {
             Text("Đang kết nối…")
                 .font(.headline)
                 .foregroundStyle(.secondary)
-            Text(connection.connectionString)
+            Text(connection.displayConnectionString)
                 .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)

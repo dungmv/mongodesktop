@@ -218,7 +218,7 @@ struct ConnectionRow: View {
                 Text(connection.name)
                     .font(.system(.body, design: .rounded, weight: .medium))
                     .foregroundStyle(isSelected ? .white : .primary)
-                Text(connection.connectionString)
+                Text(connection.displayConnectionString)
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(isSelected ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.tertiary))
                     .lineLimit(1)
