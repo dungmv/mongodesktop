@@ -3,14 +3,14 @@ import SwiftUI
 // MARK: - DatabasePickerButton
 
 struct DatabasePickerButton: View {
-    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var sessionViewModel: DatabaseSessionViewModel
     @State private var isPresented = false
     @State private var searchText = ""
 
     private var filtered: [String] {
         searchText.isEmpty
-            ? appState.databases
-            : appState.databases.filter { $0.localizedCaseInsensitiveContains(searchText) }
+            ? sessionViewModel.databases
+            : sessionViewModel.databases.filter { $0.localizedCaseInsensitiveContains(searchText) }
     }
 
     var body: some View {
@@ -21,13 +21,11 @@ struct DatabasePickerButton: View {
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             DatabasePickerPopover(
                 databases: filtered,
-                selected: appState.selectedDatabase,
+                selected: sessionViewModel.selectedDatabase,
                 searchText: $searchText,
                 isPresented: $isPresented,
                 onSelect: { db in
-                    appState.selectedDatabase = db
-                    appState.selectedCollection = nil
-                    Task { await appState.refreshCollections(database: db) }
+                    sessionViewModel.selectDatabase(db)
                 }
             )
         }

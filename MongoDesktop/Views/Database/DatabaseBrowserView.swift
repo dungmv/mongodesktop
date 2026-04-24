@@ -5,23 +5,23 @@ import AppKit
 
 struct DatabaseBrowserView: View {
     @EnvironmentObject private var connectionStore: ConnectionStore
-    @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var tabState: QueryTabState
+    @EnvironmentObject private var sessionViewModel: DatabaseSessionViewModel
+    @EnvironmentObject private var tabViewModel: QueryTabViewModel
     @Environment(\.addDatabaseTab) private var addDatabaseTab
     @State private var showServerInfo = false
 
     var body: some View {
         NavigationSplitView {
             CollectionSidebarView()
-                .environmentObject(appState)
-                .environmentObject(tabState)
+                .environmentObject(sessionViewModel)
+                .environmentObject(tabViewModel)
         } detail: {
             DatabaseDetailView()
-                .environmentObject(appState)
-                .environmentObject(tabState)
+                .environmentObject(sessionViewModel)
+                .environmentObject(tabViewModel)
         }
         .navigationSplitViewStyle(.balanced)
-        .navigationTitle(appState.connectionName)
+        .navigationTitle(sessionViewModel.connectionName)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
                 Button(action: {
@@ -32,16 +32,16 @@ struct DatabaseBrowserView: View {
                 .help("Connections")
 
                 DatabasePickerButton()
-                    .environmentObject(appState)
+                    .environmentObject(sessionViewModel)
 
                 DatabaseCollectionInlineView()
-                    .environmentObject(appState)
+                    .environmentObject(sessionViewModel)
             }
 
             ToolbarItem(placement: .principal) {
                 ConnectionStatusCenterView(showServerInfo: $showServerInfo)
-                    .environmentObject(appState)
-                    .environmentObject(tabState)
+                    .environmentObject(sessionViewModel)
+                    .environmentObject(tabViewModel)
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
@@ -53,11 +53,11 @@ struct DatabaseBrowserView: View {
             }
         }
         .overlay(alignment: .topLeading) {
-            if let error = appState.lastError {
-                ErrorBannerView(message: error) { appState.lastError = nil }
+            if let error = sessionViewModel.lastError {
+                ErrorBannerView(message: error) { sessionViewModel.clearError() }
                     .padding(12)
                     .transition(.move(edge: .top).combined(with: .opacity))
-                    .animation(.spring(duration: 0.4), value: appState.lastError)
+                    .animation(.spring(duration: 0.4), value: sessionViewModel.lastError)
             }
         }
     }
@@ -66,19 +66,19 @@ struct DatabaseBrowserView: View {
 // MARK: - CollectionSidebarView
 
 struct CollectionSidebarView: View {
-    @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var tabState: QueryTabState
+    @EnvironmentObject private var sessionViewModel: DatabaseSessionViewModel
+    @EnvironmentObject private var tabViewModel: QueryTabViewModel
     @Environment(\.databaseTabContext) private var tabContext
     @State private var collectionFilterText = ""
 
     private var filteredCollections: [String] {
         let keyword = collectionFilterText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !keyword.isEmpty else { return appState.collections }
-        return appState.collections.filter { $0.localizedCaseInsensitiveContains(keyword) }
+        guard !keyword.isEmpty else { return sessionViewModel.collections }
+        return sessionViewModel.collections.filter { $0.localizedCaseInsensitiveContains(keyword) }
     }
 
     private func iconName(for collection: String) -> String {
-        if appState.timeSeriesCollections.contains(collection) {
+        if sessionViewModel.timeSeriesCollections.contains(collection) {
             return "chart.xyaxis.line"
         }
         return "tablecells"
@@ -86,12 +86,15 @@ struct CollectionSidebarView: View {
 
     private var selectedCollectionBinding: Binding<String?> {
         Binding(
-            get: { appState.selectedCollection },
+            get: { sessionViewModel.selectedCollection },
             set: { newValue in
                 DispatchQueue.main.async {
-                    if appState.selectedCollection != newValue {
-                        appState.selectedCollection = newValue
-                        if let db = appState.selectedDatabase, let col = newValue {
+                    if sessionViewModel.selectedCollection != newValue {
+                        sessionViewModel.selectCollection(
+                            database: sessionViewModel.selectedDatabase,
+                            collection: newValue
+                        )
+                        if let db = sessionViewModel.selectedDatabase, let col = newValue {
                             tabContext?.open(db, col)
                         }
                     }
@@ -132,7 +135,7 @@ struct CollectionSidebarView: View {
 
             Divider().padding(.horizontal, 8)
 
-            if appState.collections.isEmpty {
+            if sessionViewModel.collections.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "tray")
                         .font(.largeTitle)
@@ -170,18 +173,18 @@ struct CollectionSidebarView: View {
 // MARK: - DatabaseCollectionInlineView
 
 struct DatabaseCollectionInlineView: View {
-    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var sessionViewModel: DatabaseSessionViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            if let db = appState.selectedDatabase, !db.isEmpty {
+            if let db = sessionViewModel.selectedDatabase, !db.isEmpty {
                 Text(db)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
             }
 
-            if let col = appState.selectedCollection, !col.isEmpty {
+            if let col = sessionViewModel.selectedCollection, !col.isEmpty {
                 Text(col)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -195,7 +198,7 @@ struct DatabaseCollectionInlineView: View {
 // MARK: - Titlebar Leading Content
 
 struct TitlebarLeadingContent: View {
-    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var sessionViewModel: DatabaseSessionViewModel
 
     var body: some View {
         HStack(spacing: 10) {
@@ -207,10 +210,10 @@ struct TitlebarLeadingContent: View {
             .help("Connections")
 
             DatabasePickerButton()
-                .environmentObject(appState)
+                .environmentObject(sessionViewModel)
 
             DatabaseCollectionInlineView()
-                .environmentObject(appState)
+                .environmentObject(sessionViewModel)
         }
         .padding(.leading, 6)
     }
@@ -264,8 +267,8 @@ struct TitlebarLeadingAccessoryHost<Content: View>: NSViewRepresentable {
 // MARK: - ConnectionStatusCenterView
 
 struct ConnectionStatusCenterView: View {
-    @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var tabState: QueryTabState
+    @EnvironmentObject private var sessionViewModel: DatabaseSessionViewModel
+    @EnvironmentObject private var tabViewModel: QueryTabViewModel
     @Binding var showServerInfo: Bool
 
     var body: some View {
@@ -280,29 +283,29 @@ struct ConnectionStatusCenterView: View {
                     ServerInfoPopoverView()
                 }
 
-                Text(appState.connectionName)
+                Text(sessionViewModel.connectionName)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.primary)
             }
 
             Spacer(minLength: 12)
 
-            if tabState.isLoading || tabState.lastQueryDuration != nil {
+            if tabViewModel.isLoading || tabViewModel.lastQueryDuration != nil {
                 HStack(spacing: 8) {
                     Divider().frame(height: 14)
 
-                    if tabState.isLoading {
+                    if tabViewModel.isLoading {
                         ProgressView()
                             .controlSize(.mini)
                             .frame(width: 12, height: 12)
                             .fixedSize()
-                            .opacity(tabState.isLoading ? 1 : 0)
+                            .opacity(tabViewModel.isLoading ? 1 : 0)
                     } else {
                         HStack(spacing: 4) {
                             Image(systemName: "clock")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text(tabState.lastQueryDuration.map { formattedDuration($0) } ?? "0ms")
+                            Text(tabViewModel.lastQueryDuration.map { formattedDuration($0) } ?? "0ms")
                                 .font(.system(.caption, design: .monospaced))
                                 .foregroundStyle(.secondary)
                         }

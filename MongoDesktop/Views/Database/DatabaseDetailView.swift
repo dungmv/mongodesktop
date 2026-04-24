@@ -5,8 +5,8 @@ import SwiftBSON
 // MARK: - DatabaseDetailView
 
 struct DatabaseDetailView: View {
-    @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var tabState: QueryTabState
+    @EnvironmentObject private var sessionViewModel: DatabaseSessionViewModel
+    @EnvironmentObject private var tabViewModel: QueryTabViewModel
     @EnvironmentObject private var globalSettings: GlobalSettings
     @Environment(\.databaseTabContext) private var tabContext
     @State private var filterError: String? = nil
@@ -21,7 +21,7 @@ struct DatabaseDetailView: View {
                 }
             }
             
-            if appState.selectedDatabase == nil || appState.selectedCollection == nil {
+            if sessionViewModel.selectedDatabase == nil || sessionViewModel.selectedCollection == nil {
                 WelcomeScreenView()
             } else {
                 toolbarArea
@@ -32,16 +32,16 @@ struct DatabaseDetailView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial)
         .onAppear {
-            localViewMode = tabState.viewMode
+            localViewMode = tabViewModel.viewMode
         }
-        .onChange(of: tabState.viewMode) { _, newValue in
+        .onChange(of: tabViewModel.viewMode) { _, newValue in
             guard localViewMode != newValue else { return }
             localViewMode = newValue
         }
         .onChange(of: localViewMode) { _, newValue in
-            guard tabState.viewMode != newValue else { return }
+            guard tabViewModel.viewMode != newValue else { return }
             DispatchQueue.main.async {
-                tabState.viewMode = newValue
+                tabViewModel.viewMode = newValue
             }
         }
     }
@@ -56,7 +56,7 @@ struct DatabaseDetailView: View {
                     .font(.body)
 
                 JSONEditorView(
-                    text: $tabState.filterText,
+                    text: $tabViewModel.filterText,
                     errorMessage: $filterError,
                     minHeight: 28
                 )
@@ -69,8 +69,8 @@ struct DatabaseDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 .help(filterError ?? "Filter JSON { \"field\": \"value\" }")
 
-                Button(action: { withAnimation(.easeInOut(duration: 0.2)) { tabState.isAdvancedQuery.toggle() } }) {
-                    Label(tabState.isAdvancedQuery ? "Simple" : "Advanced", systemImage: "slider.horizontal.3")
+                Button(action: { withAnimation(.easeInOut(duration: 0.2)) { tabViewModel.isAdvancedQuery.toggle() } }) {
+                    Label(tabViewModel.isAdvancedQuery ? "Simple" : "Advanced", systemImage: "slider.horizontal.3")
                         .font(.caption.weight(.medium))
                 }
                 .buttonStyle(.bordered)
@@ -93,7 +93,7 @@ struct DatabaseDetailView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
 
-            if tabState.isAdvancedQuery {
+            if tabViewModel.isAdvancedQuery {
                 advancedQueryRow
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -116,7 +116,7 @@ struct DatabaseDetailView: View {
                 .foregroundStyle(.secondary)
 
             JSONEditorView(
-                text: $tabState.sortText,
+                text: $tabViewModel.sortText,
                 errorMessage: $sortError,
                 minHeight: 28
             )
@@ -134,7 +134,7 @@ struct DatabaseDetailView: View {
                 .foregroundStyle(.secondary)
 
             JSONEditorView(
-                text: $tabState.projectionText,
+                text: $tabViewModel.projectionText,
                 errorMessage: $projectionError,
                 minHeight: 28
             )
@@ -166,39 +166,39 @@ struct DatabaseDetailView: View {
     // MARK: Pagination
     private var paginationRow: some View {
         HStack(spacing: 12) {
-            Button(action: { Task { await tabState.previousPage(appState: appState) } }) {
+            Button(action: { Task { await tabViewModel.previousPage(using: sessionViewModel) } }) {
                 Image(systemName: "chevron.left")
                     .font(.caption.weight(.semibold))
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            .disabled(tabState.currentPage == 0)
+            .disabled(tabViewModel.currentPage == 0)
 
-            Text("Trang \(tabState.currentPage + 1)")
+            Text("Trang \(tabViewModel.currentPage + 1)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
 
-            Button(action: { Task { await tabState.nextPage(appState: appState) } }) {
+            Button(action: { Task { await tabViewModel.nextPage(using: sessionViewModel) } }) {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            .disabled(!tabState.hasMore)
+            .disabled(!tabViewModel.hasMore)
 
             Divider()
                 .frame(height: 14)
                 .padding(.horizontal, 4)
 
-            Text("\(tabState.documents.count) docs")
+            Text("\(tabViewModel.documents.count) docs")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
 
             Spacer()
 
-            Text("Giới hạn \(tabState.pageSize)")
+            Text("Giới hạn \(tabViewModel.pageSize)")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             
@@ -210,9 +210,9 @@ struct DatabaseDetailView: View {
     private var contentArea: some View {
         Group {
             if localViewMode == .table {
-                DocumentTableView(documents: tabState.documents, selection: $tabState.selectedRowIds, isLoading: tabState.isLoading)
+                DocumentTableView(documents: tabViewModel.documents, selection: $tabViewModel.selectedRowIds, isLoading: tabViewModel.isLoading)
             } else {
-                DocumentJSONView(documents: tabState.documents, timeZone: globalSettings.displayTimeZone, isLoading: tabState.isLoading)
+                DocumentJSONView(documents: tabViewModel.documents, timeZone: globalSettings.displayTimeZone, isLoading: tabViewModel.isLoading)
             }
         }
     }
@@ -220,13 +220,13 @@ struct DatabaseDetailView: View {
     // MARK: Actions
     private func runFind() {
         guard !hasSyntaxError else { return }
-        tabState.resetPaging()
-        Task { await tabState.runFind(appState: appState) }
+        tabViewModel.resetPaging()
+        Task { await tabViewModel.runFind(using: sessionViewModel) }
     }
 
     private var hasSyntaxError: Bool {
         if filterError != nil { return true }
-        if tabState.isAdvancedQuery && (sortError != nil || projectionError != nil) { return true }
+        if tabViewModel.isAdvancedQuery && (sortError != nil || projectionError != nil) { return true }
         return false
     }
 
@@ -719,7 +719,7 @@ struct JSONNodeView: View {
 // MARK: - WelcomeScreenView
 
 struct WelcomeScreenView: View {
-    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var sessionViewModel: DatabaseSessionViewModel
     @State private var isAnimating = false
 
     var body: some View {
@@ -753,7 +753,7 @@ struct WelcomeScreenView: View {
             .onAppear { isAnimating = true }
             
             VStack(spacing: 12) {
-                if let db = appState.selectedDatabase, !db.isEmpty {
+                if let db = sessionViewModel.selectedDatabase, !db.isEmpty {
                     Text("Viewing Database: \(db)")
                         .font(.system(.largeTitle, design: .rounded, weight: .semibold))
                         .foregroundStyle(.primary)
