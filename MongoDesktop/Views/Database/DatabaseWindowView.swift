@@ -39,7 +39,7 @@ struct DatabaseWindowView: View {
                 WindowCoordinator.shared.showConnectionsWindow()
             }
         }
-        .frame(minWidth: 900, idealWidth: 1000, minHeight: 600, idealHeight: 720)
+        .frame(minWidth: 900, idealWidth: 1080, minHeight: 600, idealHeight: 720)
     }
 
     private var missingConnectionView: some View {

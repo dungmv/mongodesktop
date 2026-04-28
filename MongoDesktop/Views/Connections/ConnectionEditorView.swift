@@ -199,8 +199,6 @@ struct ConnectionEditorView: View {
 
     private var generalSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("General", icon: "network")
-
             // Connection name
             field("Name") {
                 TextField("e.g. Production DB", text: $draft.name)
