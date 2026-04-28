@@ -8,6 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		5C3182DD2DBFF0D8004C59B0 /* SwiftBSON in Frameworks */ = {isa = PBXBuildFile; productRef = 5C3182DC2DBFF0D8004C59B0 /* SwiftBSON */; };
+		5C3580942FA0C3BA008E23C2 /* NIOSSH in Frameworks */ = {isa = PBXBuildFile; productRef = 5C3580932FA0C3BA008E23C2 /* NIOSSH */; };
+		5C3580972FA0C3E3008E23C2 /* NIOCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5C3580962FA0C3E3008E23C2 /* NIOCore */; };
+		5C3580992FA0C3F2008E23C2 /* NIOPosix in Frameworks */ = {isa = PBXBuildFile; productRef = 5C3580982FA0C3F2008E23C2 /* NIOPosix */; };
+		5C35809B2FA0C3FF008E23C2 /* NIOTLS in Frameworks */ = {isa = PBXBuildFile; productRef = 5C35809A2FA0C3FF008E23C2 /* NIOTLS */; };
 		A1B2C3D42F00000100AAA001 /* SwiftTreeSitter in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D42F00000100AAA011 /* SwiftTreeSitter */; };
 		A1B2C3D42F00000100AAA002 /* TreeSitterJSON in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D42F00000100AAA012 /* TreeSitterJSON */; };
 /* End PBXBuildFile section */
@@ -30,8 +34,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D42F00000100AAA001 /* SwiftTreeSitter in Frameworks */,
+				5C3580992FA0C3F2008E23C2 /* NIOPosix in Frameworks */,
 				A1B2C3D42F00000100AAA002 /* TreeSitterJSON in Frameworks */,
+				5C3580942FA0C3BA008E23C2 /* NIOSSH in Frameworks */,
+				5C35809B2FA0C3FF008E23C2 /* NIOTLS in Frameworks */,
 				5C3182DD2DBFF0D8004C59B0 /* SwiftBSON in Frameworks */,
+				5C3580972FA0C3E3008E23C2 /* NIOCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -42,6 +50,7 @@
 			isa = PBXGroup;
 			children = (
 				5C3182CC2DBFF006004C59B0 /* MongoDesktop */,
+				5C3580952FA0C3E3008E23C2 /* Frameworks */,
 				5C3182CB2DBFF006004C59B0 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -52,6 +61,13 @@
 				5C3182CA2DBFF006004C59B0 /* MongoDesktop.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		5C3580952FA0C3E3008E23C2 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -78,6 +94,10 @@
 				A1B2C3D42F00000100AAA011 /* SwiftTreeSitter */,
 				A1B2C3D42F00000100AAA012 /* TreeSitterJSON */,
 				5C3182DC2DBFF0D8004C59B0 /* SwiftBSON */,
+				5C3580932FA0C3BA008E23C2 /* NIOSSH */,
+				5C3580962FA0C3E3008E23C2 /* NIOCore */,
+				5C3580982FA0C3F2008E23C2 /* NIOPosix */,
+				5C35809A2FA0C3FF008E23C2 /* NIOTLS */,
 			);
 			productName = MongoDesktop;
 			productReference = 5C3182CA2DBFF006004C59B0 /* MongoDesktop.app */;
@@ -111,6 +131,8 @@
 				A1B2C3D42F00000100AAA021 /* XCRemoteSwiftPackageReference "swift-tree-sitter" */,
 				A1B2C3D42F00000100AAA022 /* XCRemoteSwiftPackageReference "tree-sitter-json" */,
 				5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "swift-bson" */,
+				5C3580912FA0C2FA008E23C2 /* XCRemoteSwiftPackageReference "swift-nio" */,
+				5C3580922FA0C3BA008E23C2 /* XCRemoteSwiftPackageReference "swift-nio-ssh" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5C3182CB2DBFF006004C59B0 /* Products */;
@@ -429,6 +451,22 @@
 				minimumVersion = 3.1.0;
 			};
 		};
+		5C3580912FA0C2FA008E23C2 /* XCRemoteSwiftPackageReference "swift-nio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-nio.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.99.0;
+			};
+		};
+		5C3580922FA0C3BA008E23C2 /* XCRemoteSwiftPackageReference "swift-nio-ssh" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-nio-ssh.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.13.0;
+			};
+		};
 		A1B2C3D42F00000100AAA021 /* XCRemoteSwiftPackageReference "swift-tree-sitter" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/tree-sitter/swift-tree-sitter";
@@ -452,6 +490,26 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 5C3182DB2DBFF0D8004C59B0 /* XCRemoteSwiftPackageReference "swift-bson" */;
 			productName = SwiftBSON;
+		};
+		5C3580932FA0C3BA008E23C2 /* NIOSSH */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5C3580922FA0C3BA008E23C2 /* XCRemoteSwiftPackageReference "swift-nio-ssh" */;
+			productName = NIOSSH;
+		};
+		5C3580962FA0C3E3008E23C2 /* NIOCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5C3580912FA0C2FA008E23C2 /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIOCore;
+		};
+		5C3580982FA0C3F2008E23C2 /* NIOPosix */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5C3580912FA0C2FA008E23C2 /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIOPosix;
+		};
+		5C35809A2FA0C3FF008E23C2 /* NIOTLS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5C3580912FA0C2FA008E23C2 /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIOTLS;
 		};
 		A1B2C3D42F00000100AAA011 /* SwiftTreeSitter */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -118,9 +118,6 @@ struct ConnectionEditorView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var isTestingConnection = false
-    @State private var showTestAlert = false
-    @State private var testAlertTitle = ""
-    @State private var testAlertMessage = ""
     @State private var showTestDebug = false
     @State private var testDebugText = ""
 
@@ -143,14 +140,6 @@ struct ConnectionEditorView: View {
         }
         .frame(width: 480, height: 540)
         .background(.regularMaterial)
-        .alert(testAlertTitle, isPresented: $showTestAlert) {
-            if !testDebugText.isEmpty {
-                Button("Show Details") { showTestDebug = true }
-            }
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(testAlertMessage)
-        }
         .sheet(isPresented: $showTestDebug) {
             DebugTextSheet(text: testDebugText)
         }
@@ -431,23 +420,102 @@ struct ConnectionEditorView: View {
     private func runTestConnection() {
         isTestingConnection = true
         testDebugText = ""
-        let uri = draft.build().connectionString
+        let profile = draft.build()
+
         Task {
+            var log = "[Test Connection: \(profile.name)]\n"
+            log += "────────────────────────────────────────\n"
+            log += "Step 1: Validate Configuration\n"
+            log += "  • Host: \(profile.host):\(profile.port)\n"
+            log += "  • SSL/TLS: \(profile.useSSL ? "Enabled" : "Disabled")\n"
+            log += "  • SSH Tunnel: \(profile.useSSHTunnel ? "Enabled" : "Disabled")\n"
+
+            if profile.host.contains("mongodb.net") && !profile.useSSL {
+                log += "  ! WARNING: MongoDB Atlas requires SSL/TLS. Please enable it.\n"
+            }
+
+            var testURI: String
+            var tunnelStarted = false
+
             do {
-                try await MongoService.shared.testConnection(uri: uri)
+                // ── STEP 1: SSH Key Validation (if applicable) ────────────────
+                if profile.useSSHTunnel && profile.sshTunnel.authMode == .privateKey {
+                    log += "\nStep 2: Check SSH Private Key Access\n"
+                    do {
+                        try await SSHTunnelService.shared.validateKeyAccess(config: profile.sshTunnel)
+                        log += "  ✓ Key is accessible\n"
+                    } catch {
+                        log += "  ✗ Key access failed: \(error.localizedDescription)\n"
+                        throw error
+                    }
+                } else if profile.useSSHTunnel {
+                    log += "\nStep 2: Skip Key Check (using Password Auth)\n"
+                }
+
+                // ── STEP 2: SSH SOCKS5 Proxy setup ──────────────────────────
+                if profile.useSSHTunnel {
+                    log += "\nStep 3: Establish SSH SOCKS5 Proxy\n"
+                    let ssh = profile.sshTunnel
+                    log += "  • Connecting to \(ssh.sshUser)@\(ssh.sshHost):\(ssh.sshPort)...\n"
+
+                    do {
+                        let localPort = try await SSHTunnelService.shared.startSOCKS5Proxy(config: ssh)
+                        tunnelStarted = true
+                        testURI = profile.tunnelConnectionString(localPort: localPort)
+                        log += "  ✓ SOCKS5 proxy established on port \(localPort)\n"
+                    } catch {
+                        log += "  ✗ Proxy failed: \(error.localizedDescription)\n"
+                        throw error
+                    }
+                } else {
+                    testURI = profile.connectionString
+                    log += "\nStep 2: No SSH Tunnel required\n"
+                }
+
+                // ── STEP 3: MongoDB ping ──────────────────────────────────────
+                log += "\nStep 4: Test MongoDB Connection\n"
+                log += "  • URI: \(testURI.replacingOccurrences(of: profile.password, with: "****").replacingOccurrences(of: profile.sshTunnel.password, with: "****"))\n"
+                log += "  • Pinging MongoDB...\n"
+
+                do {
+                    try await MongoService.shared.testConnection(uri: testURI)
+                    log += "  ✓ MongoDB ping succeeded!\n"
+                } catch {
+                    log += "  ✗ MongoDB connection failed: \(error.localizedDescription)\n"
+                    if error.localizedDescription.contains("connection closed") {
+                        log += "  ! HINT: This often means the server expects SSL/TLS but it is disabled, or the target host/port is not accessible through the tunnel.\n"
+                    }
+                    throw error
+                }
+
+                // ── SUCCESS Cleanup ──────────────────────────────────────────
+                if tunnelStarted {
+                    await SSHTunnelService.shared.stopTunnel()
+                    log += "\nStep 5: Cleanup\n  • SSH Tunnel closed\n"
+                }
+
+                log += "\n────────────────────────────────────────\n"
+                log += "RESULT: CONNECTION SUCCESSFUL ✓"
+
                 await MainActor.run {
-                    testAlertTitle  = "Connection Successful"
-                    testAlertMessage = "MongoDB ping succeeded."
-                    showTestAlert   = true
+                    testDebugText    = log
+                    showTestDebug    = true
                     isTestingConnection = false
                 }
+
             } catch {
-                let debug = await MongoService.shared.debugConnection(uri: uri)
+                // ── FAILURE Cleanup ──────────────────────────────────────────
+                if tunnelStarted {
+                    await SSHTunnelService.shared.stopTunnel()
+                    log += "\nStep 5: Cleanup\n  • SSH Tunnel closed after error\n"
+                }
+
+                log += "\n────────────────────────────────────────\n"
+                log += "RESULT: CONNECTION FAILED ✗"
+
                 await MainActor.run {
-                    testAlertTitle   = "Connection Failed"
-                    testAlertMessage = error.localizedDescription
-                    testDebugText    = debug
-                    showTestAlert    = true
+                    testDebugText    = log
+                    showTestDebug    = true
                     isTestingConnection = false
                 }
             }

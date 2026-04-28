@@ -59,6 +59,26 @@ struct ConnectionProfile: Identifiable, Codable, Hashable {
     var useSSHTunnel: Bool
     var sshTunnel: SSHTunnelConfig
 
+    // Custom Decodable so legacy connections (without SSH fields) still load.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id              = try c.decode(UUID.self,   forKey: .id)
+        name            = try c.decode(String.self, forKey: .name)
+        host            = try c.decode(String.self, forKey: .host)
+        port            = try c.decode(Int.self,    forKey: .port)
+        username        = try c.decode(String.self, forKey: .username)
+        password        = try c.decode(String.self, forKey: .password)
+        database        = try c.decode(String.self, forKey: .database)
+        authDatabase    = try c.decode(String.self, forKey: .authDatabase)
+        useSRV          = try c.decode(Bool.self,   forKey: .useSRV)
+        useSSL          = try c.decode(Bool.self,   forKey: .useSSL)
+        createdAt       = try c.decode(Date.self,   forKey: .createdAt)
+        lastConnectedAt = try c.decodeIfPresent(Date.self, forKey: .lastConnectedAt)
+        // New fields — default gracefully when missing from old JSON
+        useSSHTunnel    = try c.decodeIfPresent(Bool.self,            forKey: .useSSHTunnel) ?? false
+        sshTunnel       = try c.decodeIfPresent(SSHTunnelConfig.self, forKey: .sshTunnel)    ?? SSHTunnelConfig()
+    }
+
     init(
         id: UUID = UUID(),
         name: String,
@@ -97,6 +117,19 @@ struct ConnectionProfile: Identifiable, Codable, Hashable {
 
     var displayConnectionString: String {
         return buildURI(maskPassword: true)
+    }
+
+    /// URI used when connecting through a SOCKS5 proxy (SSH tunnel).
+    /// Uses the real host and adds the proxy option.
+    func tunnelConnectionString(localPort: Int) -> String {
+        var uri = buildURI(maskPassword: false)
+        let proxyArg = "proxy=socks5://127.0.0.1:\(localPort)"
+        if uri.contains("?") {
+            uri += "&\(proxyArg)"
+        } else {
+            uri += "?\(proxyArg)"
+        }
+        return uri
     }
 
     private func buildURI(maskPassword: Bool) -> String {

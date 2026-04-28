@@ -33,7 +33,23 @@ final class DatabaseSessionViewModel: ObservableObject {
             selectedCollection = nil
 
             do {
-                try await mongoService.connect(uri: connection.connectionString)
+                let uri: String
+                if connection.useSSHTunnel {
+                    statusMessage = "Setting up SSH SOCKS5 proxy…"
+                    #if DEBUG
+                    print("[SSH] Starting SOCKS5 proxy → \(connection.sshTunnel.sshUser)@\(connection.sshTunnel.sshHost):\(connection.sshTunnel.sshPort)")
+                    #endif
+                    let localPort = try await SSHTunnelService.shared.startSOCKS5Proxy(config: connection.sshTunnel)
+                    uri = connection.tunnelConnectionString(localPort: localPort)
+                    #if DEBUG
+                    print("[SSH] SOCKS5 proxy ready on port \(localPort)")
+                    print("[SSH] MongoDB URI: \(uri)")
+                    #endif
+                } else {
+                    uri = connection.connectionString
+                }
+
+                try await mongoService.connect(uri: uri)
                 isConnected = true
                 statusMessage = "Connected: \(connection.name)"
                 store.markConnected(connection.id)
@@ -44,6 +60,9 @@ final class DatabaseSessionViewModel: ObservableObject {
                 isConnected = false
                 statusMessage = "Connection failed"
                 lastError = error.localizedDescription
+                if connection.useSSHTunnel {
+                    await SSHTunnelService.shared.stopTunnel()
+                }
             }
 
             isLoading = false
@@ -52,6 +71,7 @@ final class DatabaseSessionViewModel: ObservableObject {
 
     func disconnect() async throws {
         try await mongoService.disconnect()
+        await SSHTunnelService.shared.stopTunnel()
         resetConnectionState(statusMessage: "Disconnected")
     }
 
