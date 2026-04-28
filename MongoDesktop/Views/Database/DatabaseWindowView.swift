@@ -34,7 +34,7 @@ struct DatabaseWindowView: View {
         .onAppear { connectIfNeeded() }
         .onDisappear {
             Task { try? await sessionViewModel.disconnect() }
-            // Hiện lại cửa sổ Connections khi Database window đóng
+            // Show the Connections window again when a Database window closes
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 WindowCoordinator.shared.showConnectionsWindow()
             }
@@ -47,9 +47,9 @@ struct DatabaseWindowView: View {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 48, weight: .light))
                 .foregroundStyle(.secondary)
-            Text("Không tìm thấy connection")
+            Text("Connection not found")
                 .font(.title2.weight(.semibold))
-            Text("Vui lòng mở lại từ danh sách Connections.")
+            Text("Please reopen from the Connections list.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -71,7 +71,7 @@ struct DatabaseWindowView: View {
         VStack(spacing: 12) {
             ProgressView()
                 .controlSize(.large)
-            Text("Đang chuẩn bị tab…")
+            Text("Preparing tab…")
                 .font(.headline)
                 .foregroundStyle(.secondary)
         }
@@ -113,7 +113,7 @@ private struct DatabaseTabContentView: View {
                 .controlSize(.large)
                 .frame(width: 20, height: 20)
                 .fixedSize()
-            Text("Đang kết nối…")
+            Text("Connecting…")
                 .font(.headline)
                 .foregroundStyle(.secondary)
             Text(connection.displayConnectionString)
@@ -131,7 +131,7 @@ private struct DatabaseTabContentView: View {
             Image(systemName: "network.slash")
                 .font(.system(size: 48, weight: .light))
                 .foregroundStyle(.secondary)
-            Text("Không thể kết nối")
+            Text("Could not connect")
                 .font(.title2.weight(.semibold))
             if let error = sessionViewModel.lastError {
                 Text(error)
@@ -140,7 +140,7 @@ private struct DatabaseTabContentView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
-            Button("Thử lại") { sessionViewModel.connect(using: connection, store: connectionStore) }
+            Button("Retry") { sessionViewModel.connect(using: connection, store: connectionStore) }
                 .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

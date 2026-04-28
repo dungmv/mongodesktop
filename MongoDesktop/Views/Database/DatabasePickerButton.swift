@@ -17,7 +17,7 @@ struct DatabasePickerButton: View {
         Button(action: { isPresented.toggle() }) {
             Image(systemName: "cylinder.split.1x2")
         }
-        .help("Chọn/Đổi database")
+        .help("Select / Switch database")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             DatabasePickerPopover(
                 databases: filtered,
@@ -49,7 +49,7 @@ struct DatabasePickerPopover: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                     .font(.callout)
-                TextField("Tìm database...", text: $searchText)
+                TextField("Search databases...", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.callout)
                 if !searchText.isEmpty {
@@ -66,7 +66,7 @@ struct DatabasePickerPopover: View {
             Divider()
 
             if databases.isEmpty {
-                Text(searchText.isEmpty ? "Không có database" : "Không tìm thấy")
+                Text(searchText.isEmpty ? "No databases" : "No results")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .padding(20)

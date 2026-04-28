@@ -200,7 +200,7 @@ enum JSONEditorFormatter {
         let object = try parseObject(from: source)
         let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
         guard var pretty = String(data: data, encoding: .utf8) else {
-            throw NSError(domain: "JSONEditorFormatter", code: 0, userInfo: [NSLocalizedDescriptionKey: "Không thể hiển thị JSON sau khi format."])
+            throw NSError(domain: "JSONEditorFormatter", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to display formatted JSON."])
         }
         if !pretty.hasSuffix("\n") {
             pretty.append("\n")
@@ -225,7 +225,7 @@ enum JSONEditorFormatter {
         let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
         let candidate = trimmed.isEmpty ? "{}" : source
         guard let data = candidate.data(using: .utf8) else {
-            throw NSError(domain: "JSONEditorFormatter", code: 0, userInfo: [NSLocalizedDescriptionKey: "Không đọc được nội dung JSON."])
+            throw NSError(domain: "JSONEditorFormatter", code: 0, userInfo: [NSLocalizedDescriptionKey: "Unable to read JSON content."])
         }
         return try JSONSerialization.jsonObject(with: data, options: [])
     }

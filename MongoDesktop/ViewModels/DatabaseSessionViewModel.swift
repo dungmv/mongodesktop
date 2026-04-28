@@ -5,7 +5,7 @@ import SwiftUI
 final class DatabaseSessionViewModel: ObservableObject {
     @Published var selectedConnectionId: ConnectionProfile.ID?
     @Published var isConnected = false
-    @Published var statusMessage = "Chưa kết nối"
+    @Published var statusMessage = "Not connected"
     @Published var databases: [String] = []
     @Published var collections: [String] = []
     @Published var timeSeriesCollections: Set<String> = []
@@ -26,7 +26,7 @@ final class DatabaseSessionViewModel: ObservableObject {
         Task { @MainActor in
             isLoading = true
             lastError = nil
-            statusMessage = "Đang kết nối..."
+            statusMessage = "Connecting..."
             connectionName = connection.name
             selectedConnectionId = connection.id
             selectedDatabase = connection.database.isEmpty ? nil : connection.database
@@ -35,14 +35,14 @@ final class DatabaseSessionViewModel: ObservableObject {
             do {
                 try await mongoService.connect(uri: connection.connectionString)
                 isConnected = true
-                statusMessage = "Đã kết nối: \(connection.name)"
+                statusMessage = "Connected: \(connection.name)"
                 store.markConnected(connection.id)
                 async let versionFetch: Void = fetchServerVersion()
                 await refreshDatabases()
                 await versionFetch
             } catch {
                 isConnected = false
-                statusMessage = "Kết nối thất bại"
+                statusMessage = "Connection failed"
                 lastError = error.localizedDescription
             }
 
@@ -52,7 +52,7 @@ final class DatabaseSessionViewModel: ObservableObject {
 
     func disconnect() async throws {
         try await mongoService.disconnect()
-        resetConnectionState(statusMessage: "Đã ngắt kết nối")
+        resetConnectionState(statusMessage: "Disconnected")
     }
 
     func fetchServerVersion() async {

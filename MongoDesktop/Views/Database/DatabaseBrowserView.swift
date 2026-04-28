@@ -140,7 +140,7 @@ struct CollectionSidebarView: View {
                     Image(systemName: "tray")
                         .font(.largeTitle)
                         .foregroundStyle(.tertiary)
-                    Text("Không có collection")
+                    Text("No collections")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -150,7 +150,7 @@ struct CollectionSidebarView: View {
                     Image(systemName: "magnifyingglass")
                         .font(.title2)
                         .foregroundStyle(.tertiary)
-                    Text("Không tìm thấy collection")
+                    Text("No collections found")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }

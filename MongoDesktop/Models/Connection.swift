@@ -1,5 +1,46 @@
 import Foundation
 
+// MARK: - SSH Tunnel Config
+
+struct SSHTunnelConfig: Codable, Hashable {
+    var sshHost: String
+    var sshPort: Int
+    var sshUser: String
+    /// Authentication mode
+    var authMode: SSHAuthMode
+    /// Password (used when authMode == .password)
+    var password: String
+    /// Path to private key file (used when authMode == .privateKey)
+    var privateKeyPath: String
+    /// Passphrase for the private key (optional)
+    var privateKeyPassphrase: String
+
+    enum SSHAuthMode: String, Codable, CaseIterable, Hashable {
+        case password    = "Password"
+        case privateKey  = "Private Key"
+    }
+
+    init(
+        sshHost: String = "",
+        sshPort: Int = 22,
+        sshUser: String = "",
+        authMode: SSHAuthMode = .password,
+        password: String = "",
+        privateKeyPath: String = "",
+        privateKeyPassphrase: String = ""
+    ) {
+        self.sshHost = sshHost
+        self.sshPort = sshPort
+        self.sshUser = sshUser
+        self.authMode = authMode
+        self.password = password
+        self.privateKeyPath = privateKeyPath
+        self.privateKeyPassphrase = privateKeyPassphrase
+    }
+}
+
+// MARK: - ConnectionProfile
+
 struct ConnectionProfile: Identifiable, Codable, Hashable {
     var id: UUID
     var name: String
@@ -14,6 +55,10 @@ struct ConnectionProfile: Identifiable, Codable, Hashable {
     var createdAt: Date
     var lastConnectedAt: Date?
 
+    // SSH Tunnel
+    var useSSHTunnel: Bool
+    var sshTunnel: SSHTunnelConfig
+
     init(
         id: UUID = UUID(),
         name: String,
@@ -26,7 +71,9 @@ struct ConnectionProfile: Identifiable, Codable, Hashable {
         useSRV: Bool = false,
         useSSL: Bool = false,
         createdAt: Date = Date(),
-        lastConnectedAt: Date? = nil
+        lastConnectedAt: Date? = nil,
+        useSSHTunnel: Bool = false,
+        sshTunnel: SSHTunnelConfig = SSHTunnelConfig()
     ) {
         self.id = id
         self.name = name
@@ -40,6 +87,8 @@ struct ConnectionProfile: Identifiable, Codable, Hashable {
         self.useSSL = useSSL
         self.createdAt = createdAt
         self.lastConnectedAt = lastConnectedAt
+        self.useSSHTunnel = useSSHTunnel
+        self.sshTunnel = sshTunnel
     }
 
     var connectionString: String {
@@ -101,6 +150,8 @@ struct ConnectionProfile: Identifiable, Codable, Hashable {
     }
 }
 
+// MARK: - ConnectionStore
+
 @MainActor
 final class ConnectionStore: ObservableObject {
     @Published private(set) var connections: [ConnectionProfile] = []
@@ -152,7 +203,7 @@ final class ConnectionStore: ObservableObject {
             let data = try JSONEncoder().encode(connections)
             try data.write(to: fileURL, options: [.atomic])
         } catch {
-            // Silent fail for MVP; connection editing will show in-memory changes.
+            // Silent fail; in-memory changes remain visible.
         }
     }
 }

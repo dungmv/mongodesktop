@@ -23,12 +23,12 @@ struct ConnectionsListView: View {
         .sheet(item: $editorMode) { mode in
             ConnectionEditorView(mode: mode, draft: $draft, onSave: saveDraft)
         }
-        .alert("Import từ URI", isPresented: $showImportAlert) {
+        .alert("Import from URI", isPresented: $showImportAlert) {
             TextField("mongodb://host:port/db", text: $importURI)
-            Button("Hủy", role: .cancel) { importURI = "" }
+            Button("Cancel", role: .cancel) { importURI = "" }
             Button("Import") { importFromURI() }
         } message: {
-            Text("Dán connection string MongoDB vào đây")
+            Text("Paste your MongoDB connection string here.")
         }
     }
 
@@ -112,7 +112,7 @@ struct ConnectionsListView: View {
                         onSelect: { selectedId = connection.id },
                         onConnect: {
                             openWindow(value: connection.id)
-                            // Ẩn cửa sổ Connections sau khi mở Database window
+                            // Hide Connections window after opening Database window
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                                 WindowCoordinator.shared.hideConnectionsWindow()
                             }
@@ -138,10 +138,10 @@ struct ConnectionsListView: View {
             Image(systemName: "server.rack")
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(.tertiary)
-            Text("Chưa có connection nào")
+            Text("No connections yet")
                 .font(.headline)
                 .foregroundStyle(.secondary)
-            Text("Nhấn \"New Server\" hoặc dùng \"Import URI\"")
+            Text("Click \"New Server\" or use \"Import URI\" to get started.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
@@ -170,7 +170,7 @@ struct ConnectionsListView: View {
     private func duplicate(_ connection: ConnectionProfile) {
         var copied = connection
         copied.id = UUID()
-        copied.name = "\(connection.name) copy"
+        copied.name = "\(connection.name) (copy)"
         copied.lastConnectedAt = nil
         connectionStore.add(copied)
         selectedId = copied.id

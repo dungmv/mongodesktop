@@ -174,7 +174,7 @@ struct DatabaseDetailView: View {
             .controlSize(.small)
             .disabled(tabViewModel.currentPage == 0)
 
-            Text("Trang \(tabViewModel.currentPage + 1)")
+            Text("Page \(tabViewModel.currentPage + 1)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -198,7 +198,7 @@ struct DatabaseDetailView: View {
 
             Spacer()
 
-            Text("Giới hạn \(tabViewModel.pageSize)")
+            Text("Limit \(tabViewModel.pageSize)")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             
@@ -233,7 +233,7 @@ struct DatabaseDetailView: View {
     private func tabBar(_ context: DatabaseTabContext) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                // Track chứa các tabs
+                // Tab track
                 HStack(spacing: 0) {
                     ForEach(context.tabs) { tab in
                         TabPill(
@@ -250,7 +250,7 @@ struct DatabaseDetailView: View {
                         .fill(.regularMaterial) // "liquid glass" track
                 )
                 
-                // Nút cộng (+) ngoài track
+                // Add tab button (+)
                 Button(action: context.add) {
                     Image(systemName: "plus")
                         .font(.system(size: 14, weight: .medium))
@@ -417,9 +417,9 @@ struct DocumentTableView: View {
         } else if columns.isEmpty {
             VStack {
                 ContentUnavailableView(
-                    "Không có document",
+                    "No documents",
                     systemImage: "doc.text",
-                    description: Text("Collection này chưa có dữ liệu hoặc filter không khớp.")
+                    description: Text("This collection is empty or the filter returned no results.")
                 )
                 .padding(.top, 40)
                 Spacer()
@@ -540,9 +540,9 @@ struct DocumentJSONView: View {
         } else if documents.isEmpty {
             VStack {
                 ContentUnavailableView(
-                    "Không có document",
+                    "No documents",
                     systemImage: "curlybraces",
-                    description: Text("Collection này chưa có dữ liệu hoặc filter không khớp.")
+                    description: Text("This collection is empty or the filter returned no results.")
                 )
                 .padding(.top, 40)
                 Spacer()

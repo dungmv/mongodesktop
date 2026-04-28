@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // MARK: - EditorMode
 
@@ -19,12 +20,20 @@ struct ConnectionDraft {
     var name: String = ""
     var host: String = "localhost"
     var port: String = "27017"
+    var useSRV: Bool = false
+    var useSSL: Bool = false
     var username: String = ""
     var password: String = ""
     var database: String = ""
     var authDatabase: String = ""
-    var useSRV: Bool = false
-    var useSSL: Bool = false
+    var useSSHTunnel: Bool = false
+    var sshHost: String = ""
+    var sshPort: String = "22"
+    var sshUser: String = ""
+    var sshAuthMode: SSHTunnelConfig.SSHAuthMode = .password
+    var sshPassword: String = ""
+    var sshPrivateKeyPath: String = ""
+    var sshPrivateKeyPassphrase: String = ""
 
     init() {}
 
@@ -38,63 +47,39 @@ struct ConnectionDraft {
         authDatabase = connection.authDatabase
         useSRV = connection.useSRV
         useSSL = connection.useSSL
+        useSSHTunnel = connection.useSSHTunnel
+        let ssh = connection.sshTunnel
+        sshHost = ssh.sshHost
+        sshPort = String(ssh.sshPort)
+        sshUser = ssh.sshUser
+        sshAuthMode = ssh.authMode
+        sshPassword = ssh.password
+        sshPrivateKeyPath = ssh.privateKeyPath
+        sshPrivateKeyPassphrase = ssh.privateKeyPassphrase
     }
 
-    /// Parse a MongoDB URI string into a draft
     init(fromURI uri: String) {
         let trimmed = uri.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Detect SRV
-        if trimmed.hasPrefix("mongodb+srv://") {
-            useSRV = true
-        }
-
-        // Detect SSL/TLS from query params
-        if trimmed.contains("ssl=true") || trimmed.contains("tls=true") {
-            useSSL = true
-        }
-
-        // Parse using URLComponents (replace mongodb:// with http:// for parsing)
+        if trimmed.hasPrefix("mongodb+srv://") { useSRV = true }
+        if trimmed.contains("ssl=true") || trimmed.contains("tls=true") { useSSL = true }
         var httpURI = trimmed
         if httpURI.hasPrefix("mongodb+srv://") {
             httpURI = "http://" + httpURI.dropFirst("mongodb+srv://".count)
         } else if httpURI.hasPrefix("mongodb://") {
             httpURI = "http://" + httpURI.dropFirst("mongodb://".count)
         }
-
         guard let components = URLComponents(string: httpURI) else { return }
-
-        if let user = components.user, !user.isEmpty {
-            username = user
-        }
-        if let pass = components.password, !pass.isEmpty {
-            password = pass
-        }
-        if let h = components.host, !h.isEmpty {
-            host = h
-        }
-        if let p = components.port {
-            port = String(p)
-        } else if useSRV {
-            port = ""
-        }
-
-        // Path = database name
+        if let user = components.user, !user.isEmpty { username = user }
+        if let pass = components.password, !pass.isEmpty { password = pass }
+        if let h = components.host, !h.isEmpty { host = h }
+        if let p = components.port { port = String(p) } else if useSRV { port = "" }
         let path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        if !path.isEmpty {
-            database = path
-        }
-
-        // Check authSource in query
+        if !path.isEmpty { database = path }
         if let queryItems = components.queryItems {
             for item in queryItems {
-                if item.name == "authSource", let val = item.value, !val.isEmpty {
-                    authDatabase = val
-                }
+                if item.name == "authSource", let val = item.value, !val.isEmpty { authDatabase = val }
             }
         }
-
-        // Generate name from host
         name = host
     }
 
@@ -109,7 +94,17 @@ struct ConnectionDraft {
             database: database,
             authDatabase: authDatabase,
             useSRV: useSRV,
-            useSSL: useSSL
+            useSSL: useSSL,
+            useSSHTunnel: useSSHTunnel,
+            sshTunnel: SSHTunnelConfig(
+                sshHost: sshHost,
+                sshPort: Int(sshPort) ?? 22,
+                sshUser: sshUser,
+                authMode: sshAuthMode,
+                password: sshPassword,
+                privateKeyPath: sshPrivateKeyPath,
+                privateKeyPassphrase: sshPrivateKeyPassphrase
+            )
         )
     }
 }
@@ -120,6 +115,7 @@ struct ConnectionEditorView: View {
     let mode: EditorMode
     @Binding var draft: ConnectionDraft
     let onSave: (EditorMode) -> Void
+
     @Environment(\.dismiss) private var dismiss
     @State private var isTestingConnection = false
     @State private var showTestAlert = false
@@ -129,115 +125,27 @@ struct ConnectionEditorView: View {
     @State private var testDebugText = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(modeTitle)
-                        .font(.title2.weight(.bold))
-                    Text("Nhập thông tin kết nối MongoDB")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button(action: { dismiss() }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.cancelAction)
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
-            .padding(.bottom, 12)
-
-            Divider()
-
+        VStack(spacing: 0) {
+            header
+            Divider().opacity(0.5)
             ScrollView {
-                VStack(spacing: 0) {
-                    formSection(title: "Thông tin cơ bản") {
-                        VStack(spacing: 12) {
-                            formField(label: "Tên connection") {
-                                TextField("Ví dụ: Production DB", text: $draft.name)
-                            }
-                            formField(label: "Host") {
-                                TextField("localhost", text: $draft.host)
-                            }
-                            HStack(spacing: 12) {
-                                formField(label: "Port") {
-                                    TextField("27017", text: $draft.port)
-                                        .disabled(draft.useSRV)
-                                }
-                                .frame(maxWidth: 120)
-
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("Options")
-                                        .font(.caption.weight(.medium))
-                                        .foregroundStyle(.secondary)
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Toggle("Dùng SRV (mongodb+srv)", isOn: $draft.useSRV)
-                                        Toggle("TLS/SSL", isOn: $draft.useSSL)
-                                    }
-                                    .font(.callout)
-                                }
-                            }
-                        }
-                    }
-
-                    Divider().padding(.horizontal, 24)
-
-                    formSection(title: "Xác thực") {
-                        VStack(spacing: 12) {
-                            HStack(spacing: 12) {
-                                formField(label: "Username") {
-                                    TextField("Tùy chọn", text: $draft.username)
-                                }
-                                formField(label: "Password") {
-                                    SecureField("Tùy chọn", text: $draft.password)
-                                }
-                            }
-                            formField(label: "Database mặc định") {
-                                TextField("Tùy chọn", text: $draft.database)
-                            }
-                            formField(label: "Auth Database") {
-                                TextField("Mặc định: admin", text: $draft.authDatabase)
-                            }
-                        }
-                    }
+                VStack(alignment: .leading, spacing: 0) {
+                    generalSection
+                    sectionDivider
+                    authSection
+                    sectionDivider
+                    sshSection
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 4)
             }
-
-            Divider()
-
-            // Footer buttons
-            HStack {
-                Spacer()
-                Button(action: runTestConnection) {
-                    HStack(spacing: 8) {
-                        if isTestingConnection {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-                        Text(isTestingConnection ? "Đang kiểm tra..." : "Kiểm tra kết nối")
-                    }
-                }
-                .disabled(draft.host.isEmpty || isTestingConnection)
-                .buttonStyle(.bordered)
-                Button("Lưu") { onSave(mode); dismiss() }
-                    .keyboardShortcut(.return, modifiers: [])
-                    .buttonStyle(.borderedProminent)
-                    .disabled(draft.host.isEmpty)
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
+            Divider().opacity(0.5)
+            footer
         }
-        .frame(width: 540)
+        .frame(width: 480, height: 540)
         .background(.regularMaterial)
         .alert(testAlertTitle, isPresented: $showTestAlert) {
             if !testDebugText.isEmpty {
-                Button("Chi tiết") { showTestDebug = true }
+                Button("Show Details") { showTestDebug = true }
             }
             Button("OK", role: .cancel) {}
         } message: {
@@ -248,35 +156,278 @@ struct ConnectionEditorView: View {
         }
     }
 
-    private var modeTitle: String {
-        switch mode {
-        case .create: return "Thêm connection"
-        case .edit: return "Sửa connection"
+    // MARK: - Header
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(
+                        colors: [Color(hue: 0.38, saturation: 0.65, brightness: 0.68),
+                                 Color(hue: 0.5, saturation: 0.6, brightness: 0.6)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ))
+                    .frame(width: 30, height: 30)
+                Image(systemName: "leaf.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .shadow(color: .green.opacity(0.3), radius: 4, y: 2)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(mode.title)
+                    .font(.system(.subheadline, design: .rounded, weight: .bold))
+                Text("Configure your MongoDB connection")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button(action: { dismiss() }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 16))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.cancelAction)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    // MARK: - General Section
+
+    private var generalSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("General", icon: "network")
+
+            // Connection name
+            field("Name") {
+                TextField("e.g. Production DB", text: $draft.name)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            // Host + Port inline
+            HStack(spacing: 10) {
+                field("Host") {
+                    TextField("localhost", text: $draft.host)
+                        .textFieldStyle(.roundedBorder)
+                }
+                field("Port") {
+                    TextField("27017", text: $draft.port)
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(draft.useSRV)
+                        .opacity(draft.useSRV ? 0.4 : 1)
+                }
+                .frame(width: 80)
+            }
+
+            // Toggles
+            HStack(spacing: 20) {
+                Toggle("Use SRV", isOn: $draft.useSRV)
+                    .onChange(of: draft.useSRV) { _, v in draft.port = v ? "" : "27017" }
+                Toggle("TLS / SSL", isOn: $draft.useSSL)
+            }
+            .font(.callout)
+            .toggleStyle(.checkbox)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+    }
+
+    // MARK: - Auth Section
+
+    private var authSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Authentication", icon: "key.fill")
+
+            HStack(spacing: 10) {
+                field("Username") {
+                    TextField("Optional", text: $draft.username)
+                        .textFieldStyle(.roundedBorder)
+                }
+                field("Password") {
+                    SecureField("Optional", text: $draft.password)
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+
+            HStack(spacing: 10) {
+                field("Default Database") {
+                    TextField("Optional", text: $draft.database)
+                        .textFieldStyle(.roundedBorder)
+                }
+                field("Auth Database") {
+                    TextField("admin", text: $draft.authDatabase)
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+    }
+
+    // MARK: - SSH Section
+
+    private var sshSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header row with toggle
+            HStack {
+                sectionHeader("SSH Tunnel", icon: "lock.shield.fill")
+                Spacer()
+                Toggle("", isOn: $draft.useSSHTunnel.animation(.easeInOut(duration: 0.2)))
+                    .labelsHidden()
+                    .tint(.green)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 14)
+            .padding(.bottom, draft.useSSHTunnel ? 12 : 14)
+
+            if draft.useSSHTunnel {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 10) {
+                        field("SSH Host") {
+                            TextField("ssh.example.com", text: $draft.sshHost)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                        field("Port") {
+                            TextField("22", text: $draft.sshPort)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                        .frame(width: 70)
+                    }
+
+                    field("SSH Username") {
+                        TextField("e.g. ubuntu", text: $draft.sshUser)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    // Auth mode pills
+                    HStack(spacing: 0) {
+                        ForEach(SSHTunnelConfig.SSHAuthMode.allCases, id: \.self) { m in
+                            let active = draft.sshAuthMode == m
+                            Button { withAnimation(.easeInOut(duration: 0.15)) { draft.sshAuthMode = m } } label: {
+                                Text(m.rawValue)
+                                    .font(.system(.caption, design: .rounded, weight: active ? .semibold : .regular))
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 5)
+                                    .frame(maxWidth: .infinity)
+                                    .background(active ? Color.accentColor : .clear,
+                                                in: RoundedRectangle(cornerRadius: 6))
+                                    .foregroundStyle(active ? .white : .secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(3)
+                    .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
+
+                    if draft.sshAuthMode == .password {
+                        field("SSH Password") {
+                            SecureField("Enter SSH password", text: $draft.sshPassword)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                    } else {
+                        field("Private Key Path") {
+                            HStack(spacing: 6) {
+                                TextField("~/.ssh/id_rsa", text: $draft.sshPrivateKeyPath)
+                                    .textFieldStyle(.roundedBorder)
+                                Button(action: browsePrivateKey) {
+                                    Image(systemName: "folder")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Browse…")
+                            }
+                        }
+                        field("Passphrase") {
+                            SecureField("Optional", text: $draft.sshPrivateKeyPassphrase)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 14)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
     }
 
+    // MARK: - Footer
+
+    private var footer: some View {
+        HStack(spacing: 8) {
+            Spacer()
+            Button(action: runTestConnection) {
+                HStack(spacing: 5) {
+                    if isTestingConnection {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    Text(isTestingConnection ? "Testing…" : "Test Connection")
+                        .font(.callout)
+                }
+            }
+            .buttonStyle(.bordered)
+            .disabled(draft.host.isEmpty || isTestingConnection)
+
+            Button(action: { onSave(mode); dismiss() }) {
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("Save")
+                        .font(.callout.weight(.semibold))
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut(.return, modifiers: [])
+            .disabled(draft.host.isEmpty)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    // MARK: - Reusable bits
+
+    private func sectionHeader(_ title: String, icon: String) -> some View {
+        Label(title, systemImage: icon)
+            .font(.system(.caption, design: .rounded, weight: .semibold))
+            .foregroundStyle(.secondary)
+    }
+
     @ViewBuilder
-    private func formSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+    private func field<C: View>(_ label: String, @ViewBuilder content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.primary.opacity(0.55))
             content()
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    @ViewBuilder
-    private func formField<Content: View>(label: String, @ViewBuilder field: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(label)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-            field()
-                .textFieldStyle(.roundedBorder)
+    private var sectionDivider: some View {
+        Divider()
+            .padding(.horizontal, 18)
+            .opacity(0.4)
+    }
+
+    // MARK: - Actions
+
+    private func browsePrivateKey() {
+        let panel = NSOpenPanel()
+        panel.title = "Select Private Key"
+        panel.prompt = "Select"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.showsHiddenFiles = true
+        if panel.runModal() == .OK, let url = panel.url {
+            draft.sshPrivateKeyPath = url.path
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func runTestConnection() {
@@ -287,24 +438,39 @@ struct ConnectionEditorView: View {
             do {
                 try await MongoService.shared.testConnection(uri: uri)
                 await MainActor.run {
-                    testAlertTitle = "Kết nối thành công"
-                    testAlertMessage = "Đã ping MongoDB thành công."
-                    showTestAlert = true
+                    testAlertTitle  = "Connection Successful"
+                    testAlertMessage = "MongoDB ping succeeded."
+                    showTestAlert   = true
                     isTestingConnection = false
                 }
             } catch {
-                let debugText = await MongoService.shared.debugConnection(uri: uri)
+                let debug = await MongoService.shared.debugConnection(uri: uri)
                 await MainActor.run {
-                    testAlertTitle = "Kết nối thất bại"
+                    testAlertTitle   = "Connection Failed"
                     testAlertMessage = error.localizedDescription
-                    testDebugText = debugText
-                    showTestAlert = true
+                    testDebugText    = debug
+                    showTestAlert    = true
                     isTestingConnection = false
                 }
             }
         }
     }
 }
+
+// MARK: - EditorMode helpers
+
+private extension EditorMode {
+    var title: String {
+        switch self {
+        case .create: return "New Connection"
+        case .edit:   return "Edit Connection"
+        }
+    }
+}
+
+
+
+// MARK: - DebugTextSheet
 
 private struct DebugTextSheet: View {
     let text: String
@@ -314,39 +480,31 @@ private struct DebugTextSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Debug")
-                    .font(.headline)
+                Label("Debug Log", systemImage: "terminal.fill").font(.headline)
                 Spacer()
                 if didCopy {
-                    Text("Đã copy")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text("Copied!").font(.caption).foregroundStyle(.secondary).transition(.opacity)
                 }
-                Button("Copy") { copyText() }
-                Button("Đóng") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
+                Button(action: copyText) { Label("Copy", systemImage: "doc.on.doc") }
+                Button("Close") { dismiss() }.keyboardShortcut(.cancelAction)
             }
             .padding(.bottom, 4)
-
             ScrollView {
-                Text(text.isEmpty ? "Không có dữ liệu." : text)
+                Text(text.isEmpty ? "No data available." : text)
                     .font(.system(.body, design: .monospaced))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
             }
-            .frame(minHeight: 300)
+            .frame(minHeight: 280)
         }
         .padding(20)
-        .frame(width: 640, height: 480)
+        .frame(width: 580, height: 420)
     }
 
     private func copyText() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
-        didCopy = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            didCopy = false
-        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        withAnimation { didCopy = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { withAnimation { didCopy = false } }
     }
 }

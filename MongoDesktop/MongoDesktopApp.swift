@@ -2,18 +2,18 @@ import SwiftUI
 
 // MARK: - WindowCoordinator
 
-/// Quản lý singleton cửa sổ ConnectionsListView (ẩn/hiện).
+/// Manages the singleton Connections window (hide / show).
 @MainActor
 final class WindowCoordinator: ObservableObject {
     static let shared = WindowCoordinator()
     private init() {}
 
-    /// Ẩn cửa sổ Connections (khi vừa connect)
+    /// Hides the Connections window (called after connecting)
     func hideConnectionsWindow() {
         connectionsWindow?.orderOut(nil)
     }
 
-    /// Hiện lại cửa sổ Connections (khi database window đóng)
+    /// Shows the Connections window again (called when a database window closes)
     func showConnectionsWindow() {
         if let win = connectionsWindow {
             win.makeKeyAndOrderFront(nil)

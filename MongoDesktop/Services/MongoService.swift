@@ -130,7 +130,7 @@ actor MongoService {
 
         guard case .document(let cursor)? = reply["cursor"],
               case .array(let batch)? = cursor["firstBatch"] else {
-            throw MongoServiceError.commandFailed("Không đọc được metadata collection.")
+            throw MongoServiceError.commandFailed("Unable to read collection metadata.")
         }
 
         var results: [CollectionInfo] = []
@@ -222,12 +222,12 @@ actor MongoService {
     ) async throws -> [BSONDocument] {
         let client = try requireClient()
         guard let db = mongoc_client_get_database(client, database) else {
-            throw MongoServiceError.commandFailed("Không thể mở database '\(database)'.")
+            throw MongoServiceError.commandFailed("Could not open database '\(database)'.")
         }
         defer { mongoc_database_destroy(db) }
 
         guard let coll = mongoc_database_get_collection(db, collection) else {
-            throw MongoServiceError.commandFailed("Không thể mở collection '\(collection)'.")
+            throw MongoServiceError.commandFailed("Could not open collection '\(collection)'.")
         }
         defer { mongoc_collection_destroy(coll) }
 
@@ -259,7 +259,7 @@ actor MongoService {
         }
 
         guard let cursor = mongoc_collection_find_with_opts(coll, filterBson, &opts, nil) else {
-            throw MongoServiceError.queryFailed("Không thể tạo cursor.")
+            throw MongoServiceError.queryFailed("Could not create cursor.")
         }
         defer { mongoc_cursor_destroy(cursor) }
 
@@ -329,7 +329,7 @@ actor MongoService {
         var error = bson_error_t()
         guard let parsed = mongoc_uri_new_with_error(uri, &error) else {
             let msg = errorMessage(error)
-            let detail = msg.isEmpty ? "Không thể parse URI." : "Không thể parse URI: \(msg)"
+            let detail = msg.isEmpty ? "Failed to parse URI." : "Failed to parse URI: \(msg)"
             throw MongoServiceError.connectionFailed("\(detail)\nURI: \(redactedURI(uri))\nDomain: \(error.domain)  Code: \(error.code)")
         }
         defer { mongoc_uri_destroy(parsed) }
@@ -337,7 +337,7 @@ actor MongoService {
         var createError = bson_error_t()
         guard let client = mongoc_client_new_from_uri_with_error(parsed, &createError) else {
             let msg = errorMessage(createError)
-            let detail = msg.isEmpty ? "Không thể khởi tạo Mongo client." : "Không thể khởi tạo Mongo client: \(msg)"
+            let detail = msg.isEmpty ? "Failed to initialize Mongo client." : "Failed to initialize Mongo client: \(msg)"
             throw MongoServiceError.connectionFailed("\(detail)\nURI: \(redactedURI(uri))\nDomain: \(createError.domain)  Code: \(createError.code)")
         }
         return client
@@ -394,15 +394,15 @@ enum MongoServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notConnected:
-            return "Chưa kết nối MongoDB."
+            return "Not connected to MongoDB."
         case .connectionFailed(let message):
-            return message.isEmpty ? "Kết nối MongoDB thất bại." : message
+            return message.isEmpty ? "MongoDB connection failed." : message
         case .commandFailed(let message):
-            return message.isEmpty ? "Lệnh MongoDB thất bại." : message
+            return message.isEmpty ? "MongoDB command failed." : message
         case .queryFailed(let message):
-            return message.isEmpty ? "Truy vấn MongoDB thất bại." : message
+            return message.isEmpty ? "MongoDB query failed." : message
         case .bsonError(let message):
-            return message.isEmpty ? "Dữ liệu BSON không hợp lệ." : message
+            return message.isEmpty ? "Invalid BSON data." : message
         }
     }
 }
