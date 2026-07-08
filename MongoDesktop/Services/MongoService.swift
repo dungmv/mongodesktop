@@ -528,6 +528,134 @@ actor MongoService {
         }
     }
 
+    func dropCollection(database: String, collection: String) async throws {
+        let client = try requireClient()
+        guard let db = mongoc_client_get_database(client, database) else {
+            throw MongoServiceError.commandFailed("Could not open database '\(database)'.")
+        }
+        defer { mongoc_database_destroy(db) }
+
+        guard let coll = mongoc_database_get_collection(db, collection) else {
+            throw MongoServiceError.commandFailed("Could not open collection '\(collection)'.")
+        }
+        defer { mongoc_collection_destroy(coll) }
+
+        var error = bson_error_t()
+        let ok = mongoc_collection_drop(coll, &error)
+        guard ok else {
+            throw MongoServiceError.commandFailed(errorMessage(error))
+        }
+    }
+
+    func exportCollection(
+        database: String,
+        collection: String,
+        filter: BSONDocument,
+        sort: BSONDocument? = nil,
+        projection: BSONDocument? = nil,
+        to fileURL: URL,
+        format: ExportFormat,
+        onProgress: @escaping (Int) -> Void
+    ) async throws {
+        let client = try requireClient()
+        guard let db = mongoc_client_get_database(client, database) else {
+            throw MongoServiceError.commandFailed("Could not open database '\(database)'.")
+        }
+        defer { mongoc_database_destroy(db) }
+
+        guard let coll = mongoc_database_get_collection(db, collection) else {
+            throw MongoServiceError.commandFailed("Could not open collection '\(collection)'.")
+        }
+        defer { mongoc_collection_destroy(coll) }
+
+        let filterBson = try bsonFromDocument(filter)
+        defer { bson_destroy(filterBson) }
+
+        var opts = bson_t()
+        bson_init(&opts)
+        
+        var sortBson: UnsafeMutablePointer<bson_t>?
+        var projectionBson: UnsafeMutablePointer<bson_t>?
+        if let sort, !sort.isEmpty {
+            sortBson = try bsonFromDocument(sort)
+            bson_append_document(&opts, "sort", -1, sortBson)
+        }
+        if let projection, !projection.isEmpty {
+            projectionBson = try bsonFromDocument(projection)
+            bson_append_document(&opts, "projection", -1, projectionBson)
+        }
+        defer {
+            if let sortBson { bson_destroy(sortBson) }
+            if let projectionBson { bson_destroy(projectionBson) }
+            bson_destroy(&opts)
+        }
+
+        guard let cursor = mongoc_collection_find_with_opts(coll, filterBson, &opts, nil) else {
+            throw MongoServiceError.queryFailed("Could not create cursor.")
+        }
+        defer { mongoc_cursor_destroy(cursor) }
+
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            try FileManager.default.removeItem(at: fileURL)
+        }
+        try "".write(to: fileURL, atomically: true, encoding: .utf8)
+        
+        let fileHandle = try FileHandle(forWritingTo: fileURL)
+        defer {
+            try? fileHandle.close()
+        }
+
+        if format == .jsonArray {
+            try fileHandle.write(contentsOf: Data("[\n".utf8))
+        }
+
+        var count = 0
+        var docPtr: UnsafePointer<bson_t>?
+        var isFirst = true
+        
+        while mongoc_cursor_next(cursor, &docPtr) {
+            if Task.isCancelled {
+                break
+            }
+            if let docPtr {
+                if let doc = try? documentFromBson(docPtr) {
+                    let jsonString = doc.toRelaxedExtendedJSONString()
+                    
+                    var line = ""
+                    if format == .jsonArray {
+                        if !isFirst {
+                            line += ",\n"
+                        } else {
+                            isFirst = false
+                        }
+                        line += "  " + jsonString
+                    } else {
+                        line += jsonString + "\n"
+                    }
+                    
+                    try fileHandle.write(contentsOf: Data(line.utf8))
+                    
+                    count += 1
+                    if count % 100 == 0 {
+                        onProgress(count)
+                    }
+                }
+            }
+        }
+
+        if format == .jsonArray {
+            try fileHandle.write(contentsOf: Data("\n]\n".utf8))
+        }
+
+        var error = bson_error_t()
+        if mongoc_cursor_error(cursor, &error) {
+            throw MongoServiceError.queryFailed(errorMessage(error))
+        }
+        
+        onProgress(count)
+    }
+
+
     func runAggregate(
         database: String,
         collection: String,
@@ -777,3 +905,11 @@ enum MongoServiceError: LocalizedError {
         }
     }
 }
+
+enum ExportFormat: String, CaseIterable, Identifiable {
+    case jsonArray = "JSON Array"
+    case jsonLines = "JSON Lines (NDJSON)"
+
+    var id: String { rawValue }
+}
+

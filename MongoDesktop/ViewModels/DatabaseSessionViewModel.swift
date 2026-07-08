@@ -198,6 +198,24 @@ final class DatabaseSessionViewModel: ObservableObject {
         selectedCollection = collection
     }
 
+    func dropCollection(database: String, collection: String) async -> Bool {
+        isLoading = true
+        lastError = nil
+        do {
+            try await mongoService.dropCollection(database: database, collection: collection)
+            if selectedCollection == collection && selectedDatabase == database {
+                selectedCollection = nil
+            }
+            await refreshCollections(database: database)
+            isLoading = false
+            return true
+        } catch {
+            lastError = error.localizedDescription
+            isLoading = false
+            return false
+        }
+    }
+
     func clearError() {
         lastError = nil
     }

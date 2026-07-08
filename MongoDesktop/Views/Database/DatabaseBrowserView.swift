@@ -18,6 +18,8 @@ struct DatabaseBrowserView: View {
         NavigationSplitView {
             CollectionSidebarView()
                 .environmentObject(sessionViewModel)
+                .environmentObject(tabViewModel)
+                .environmentObject(findVM)
         } detail: {
             DatabaseDetailView(showQueryConsole: $showQueryConsole)
                 .environmentObject(sessionViewModel)
