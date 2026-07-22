@@ -42,6 +42,21 @@ struct DocumentEditorSheet: View {
                     minHeight: 300
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay(alignment: .topTrailing) {
+                    Button {
+                        formatJSON()
+                    } label: {
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .padding(6)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Format Pretty JSON")
+                    .disabled(isSaving)
+                    .padding(10)
+                }
                 .overlay {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .stroke(errorMessage == nil ? Color.secondary.opacity(0.3) : Color.red.opacity(0.7), lineWidth: 1)
@@ -49,9 +64,10 @@ struct DocumentEditorSheet: View {
                 .padding()
 
                 if let errorMessage {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundColor(.red)
+                            .font(.caption)
                         Text(errorMessage)
                             .font(.caption)
                             .foregroundColor(.red)
@@ -59,7 +75,7 @@ struct DocumentEditorSheet: View {
                         Spacer()
                     }
                     .padding(.horizontal)
-                    .padding(.bottom)
+                    .padding(.bottom, 8)
                 }
             }
             .navigationTitle(title)
@@ -79,6 +95,16 @@ struct DocumentEditorSheet: View {
             }
         }
         .frame(minWidth: 550, minHeight: 450)
+    }
+
+    private func formatJSON() {
+        do {
+            let formatted = try JSONEditorFormatter.prettyFormatted(jsonText)
+            jsonText = formatted
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func save() {
