@@ -109,8 +109,8 @@ struct CollectionDocumentView: View {
                         findVM.isAdvancedQuery.toggle()
                     }
                 }) {
-                    Image(systemName: "slider.horizontal.3")
-                        .foregroundStyle(findVM.isAdvancedQuery ? Color.accentColor : .secondary)
+                    Image(systemName: findVM.isAdvancedQuery ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        .foregroundStyle(.secondary)
                         .font(.body)
                 }
                 .buttonStyle(.plain)
