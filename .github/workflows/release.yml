@@ -1,0 +1,240 @@
+name: Release DMG
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Package DMG
+    runs-on: macos-15
+
+    env:
+      SCHEME: MongoDesktop
+      PROJECT: MongoDesktop.xcodeproj
+      BUNDLE_ID: com.dungmv.mongodesktop.MongoDesktop
+      APP_NAME: MongoDesktop
+
+    steps:
+      # ──────────────────────────────────────────────
+      # 1. Checkout
+      # ──────────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ──────────────────────────────────────────────
+      # 2. Select Xcode
+      # ──────────────────────────────────────────────
+      - name: Select Xcode 16
+        run: sudo xcode-select -s /Applications/Xcode_16.3.app
+
+      # ──────────────────────────────────────────────
+      # 3. Install mongo-c-driver via Homebrew
+      #    (needed for header / lib search paths)
+      # ──────────────────────────────────────────────
+      - name: Install mongo-c-driver
+        run: brew install mongo-c-driver
+
+      # ──────────────────────────────────────────────
+      # 4. Import Apple Developer certificates
+      #    Secrets required (see README for setup):
+      #      BUILD_CERTIFICATE_BASE64  – p12 exported from Keychain
+      #      P12_PASSWORD              – password for the p12
+      #      KEYCHAIN_PASSWORD         – temp keychain password
+      # ──────────────────────────────────────────────
+      - name: Import signing certificate
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERTIFICATE_PATH"
+
+          # Create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+
+          # Allow codesign to access key
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Add to search list
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+      # ──────────────────────────────────────────────
+      # 5. Extract version from tag  (v1.2.3 → 1.2.3)
+      # ──────────────────────────────────────────────
+      - name: Extract version
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
+
+      # ──────────────────────────────────────────────
+      # 6. Build & Archive
+      # ──────────────────────────────────────────────
+      - name: Build archive
+        run: |
+          MONGO_INCLUDE=$(brew --prefix mongo-c-driver)/include
+          MONGO_LIB=$(brew --prefix mongo-c-driver)/lib
+
+          # Find versioned include subdirs
+          MONGOC_INCLUDE=$(ls -d "$MONGO_INCLUDE"/mongoc-* 2>/dev/null | head -1)
+          BSON_INCLUDE=$(ls -d "$MONGO_INCLUDE"/bson-* 2>/dev/null | head -1)
+
+          xcodebuild archive \
+            -project "$PROJECT" \
+            -scheme   "$SCHEME" \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/$APP_NAME.xcarchive" \
+            ONLY_ACTIVE_ARCH=NO \
+            EXCLUDED_ARCHS="" \
+            HEADER_SEARCH_PATHS="$MONGOC_INCLUDE $BSON_INCLUDE" \
+            LIBRARY_SEARCH_PATHS="$MONGO_LIB" \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=${{ secrets.DEVELOPMENT_TEAM }} \
+            | xcpretty
+
+      # ──────────────────────────────────────────────
+      # 7. Export .app from archive
+      # ──────────────────────────────────────────────
+      - name: Export app
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>developer-id</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>teamID</key>
+            <string>${{ secrets.DEVELOPMENT_TEAM }}</string>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/$APP_NAME.xcarchive" \
+            -exportPath  "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            | xcpretty
+
+      # ──────────────────────────────────────────────
+      # 8. Notarize the .app
+      #    Secrets required:
+      #      APPLE_ID          – your Apple ID email
+      #      APPLE_TEAM_ID     – team ID (A5367HLPFW)
+      #      NOTARYTOOL_PASS   – app-specific password from appleid.apple.com
+      # ──────────────────────────────────────────────
+      - name: Notarize app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          NOTARYTOOL_PASS: ${{ secrets.NOTARYTOOL_PASS }}
+        run: |
+          APP_PATH="$RUNNER_TEMP/export/$APP_NAME.app"
+
+          # Zip for notarization
+          ditto -c -k --keepParent "$APP_PATH" "$RUNNER_TEMP/$APP_NAME-notarize.zip"
+
+          # Submit and wait
+          xcrun notarytool submit "$RUNNER_TEMP/$APP_NAME-notarize.zip" \
+            --apple-id   "$APPLE_ID" \
+            --team-id    "$APPLE_TEAM_ID" \
+            --password   "$NOTARYTOOL_PASS" \
+            --wait
+
+          # Staple ticket
+          xcrun stapler staple "$APP_PATH"
+
+      # ──────────────────────────────────────────────
+      # 9. Create DMG with create-dmg
+      # ──────────────────────────────────────────────
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Create DMG
+        id: dmg
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG_NAME="${APP_NAME}-${VERSION}.dmg"
+          APP_PATH="$RUNNER_TEMP/export/$APP_NAME.app"
+
+          create-dmg \
+            --volname "$APP_NAME $VERSION" \
+            --volicon "$APP_NAME/Assets.xcassets/AppIcon.appiconset/AppIcon-512.png" \
+            --window-pos 200 120 \
+            --window-size 660 400 \
+            --icon-size 128 \
+            --icon "$APP_NAME.app" 190 160 \
+            --hide-extension "$APP_NAME.app" \
+            --app-drop-link 470 160 \
+            "$RUNNER_TEMP/$DMG_NAME" \
+            "$APP_PATH" \
+          || true   # create-dmg exits 1 even on success when no signing
+
+          echo "dmg_path=$RUNNER_TEMP/$DMG_NAME" >> "$GITHUB_OUTPUT"
+          echo "dmg_name=$DMG_NAME"               >> "$GITHUB_OUTPUT"
+
+      # ──────────────────────────────────────────────
+      # 10. Sign the DMG
+      # ──────────────────────────────────────────────
+      - name: Sign DMG
+        run: |
+          codesign --force --sign "Developer ID Application" \
+            "${{ steps.dmg.outputs.dmg_path }}"
+
+      # ──────────────────────────────────────────────
+      # 11. Notarize the DMG
+      # ──────────────────────────────────────────────
+      - name: Notarize DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          NOTARYTOOL_PASS: ${{ secrets.NOTARYTOOL_PASS }}
+        run: |
+          DMG_PATH="${{ steps.dmg.outputs.dmg_path }}"
+
+          xcrun notarytool submit "$DMG_PATH" \
+            --apple-id   "$APPLE_ID" \
+            --team-id    "$APPLE_TEAM_ID" \
+            --password   "$NOTARYTOOL_PASS" \
+            --wait
+
+          xcrun stapler staple "$DMG_PATH"
+
+      # ──────────────────────────────────────────────
+      # 12. Create GitHub Release & upload DMG
+      # ──────────────────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Mongo Desktop ${{ steps.version.outputs.version }}"
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            ## Mongo Desktop ${{ steps.version.outputs.version }}
+
+            ### Installation
+            1. Download **${{ steps.dmg.outputs.dmg_name }}** below
+            2. Open the DMG and drag **Mongo Desktop** to your Applications folder
+            3. Launch from Applications
+
+            > **macOS requirement**: macOS 26.0 or later (Apple Silicon)
+          files: ${{ steps.dmg.outputs.dmg_path }}
