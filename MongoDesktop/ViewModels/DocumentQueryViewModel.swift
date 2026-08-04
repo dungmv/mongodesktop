@@ -359,6 +359,52 @@ final class DocumentQueryViewModel: ObservableObject {
         }
     }
 
+    func updateDocuments(
+        database: String,
+        collection: String,
+        filter: BSONDocument,
+        update: BSONDocument,
+        session: DatabaseSessionViewModel
+    ) async -> Int? {
+        isLoading = true
+        session.lastError = nil
+        let start = Date()
+        let queryLabel = "Filter: \(filter.toRelaxedExtendedJSONString()), Update: \(update.toRelaxedExtendedJSONString())"
+        do {
+            let count = try await mongoService.updateDocuments(
+                database: database,
+                collection: collection,
+                filter: filter,
+                update: update
+            )
+            let duration = Date().timeIntervalSince(start)
+            QueryHistoryStore.shared.record(
+                database: database,
+                collection: collection,
+                queryType: .update,
+                queryText: queryLabel,
+                duration: duration,
+                resultCount: count
+            )
+            await runFind(database: database, collection: collection, session: session)
+            return count
+        } catch {
+            let duration = Date().timeIntervalSince(start)
+            session.lastError = error.localizedDescription
+            QueryHistoryStore.shared.record(
+                database: database,
+                collection: collection,
+                queryType: .update,
+                queryText: queryLabel,
+                duration: duration,
+                isError: true,
+                errorMessage: error.localizedDescription
+            )
+            isLoading = false
+            return nil
+        }
+    }
+
     private func isCurrentFind(_ generation: Int) -> Bool {
         findGeneration == generation
     }

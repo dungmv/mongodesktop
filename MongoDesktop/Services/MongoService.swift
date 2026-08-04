@@ -528,6 +528,44 @@ actor MongoService {
         }
     }
 
+    func updateDocuments(
+        database: String,
+        collection: String,
+        filter: BSONDocument,
+        update: BSONDocument
+    ) async throws -> Int {
+        let client = try requireClient()
+        let command: BSONDocument = [
+            "update": .string(collection),
+            "updates": .array([
+                .document([
+                    "q": .document(filter),
+                    "u": .document(update),
+                    "multi": .bool(true)
+                ])
+            ])
+        ]
+        let reply = try runCommand(client: client, database: database, command: command)
+
+        if let nModified = reply["nModified"] {
+            switch nModified {
+            case .int32(let value): return Int(value)
+            case .int64(let value): return Int(value)
+            case .double(let value): return Int(value)
+            default: break
+            }
+        }
+        if let n = reply["n"] {
+            switch n {
+            case .int32(let value): return Int(value)
+            case .int64(let value): return Int(value)
+            case .double(let value): return Int(value)
+            default: break
+            }
+        }
+        return 0
+    }
+
     func dropCollection(database: String, collection: String) async throws {
         let client = try requireClient()
         guard let db = mongoc_client_get_database(client, database) else {

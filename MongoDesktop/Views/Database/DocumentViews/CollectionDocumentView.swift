@@ -14,6 +14,10 @@ struct CollectionDocumentView: View {
     @State private var editingDocument: BSONDocument? = nil
     @State private var documentsToDelete: [BSONDocument]? = nil
 
+    @State private var showUpdateSheet = false
+    @State private var showExportSheet = false
+    @State private var confirmBulkDelete = false
+
     var body: some View {
         VStack(spacing: 0) {
             toolbarArea
@@ -73,6 +77,43 @@ struct CollectionDocumentView: View {
                 )
             }
         }
+        .sheet(isPresented: $showUpdateSheet) {
+            if let db = sessionViewModel.selectedDatabase,
+               let col = sessionViewModel.selectedCollection {
+                CollectionUpdateSheet(
+                    database: db,
+                    collection: col,
+                    filterText: findVM.filterText,
+                    existingDocuments: findVM.documents,
+                    totalCount: findVM.totalDocuments,
+                    documentKeys: findVM.documentKeysForCompletion,
+                    isPresented: $showUpdateSheet,
+                    onUpdate: { filter, updateDoc in
+                        _ = await findVM.updateDocuments(
+                            database: db,
+                            collection: col,
+                            filter: filter,
+                            update: updateDoc,
+                            session: sessionViewModel
+                        )
+                    }
+                )
+            }
+        }
+        .sheet(isPresented: $showExportSheet) {
+            if let db = sessionViewModel.selectedDatabase,
+               let col = sessionViewModel.selectedCollection {
+                CollectionExportSheet(
+                    database: db,
+                    collection: col,
+                    defaultFilter: findVM.filterText,
+                    defaultSort: findVM.sortText,
+                    defaultProjection: findVM.projectionText,
+                    documentKeys: findVM.documentKeysForCompletion,
+                    isPresented: $showExportSheet
+                )
+            }
+        }
         .alert("Delete \(documentsToDelete?.count == 1 ? "Document" : "Documents")", isPresented: Binding(get: { documentsToDelete != nil }, set: { if !$0 { documentsToDelete = nil } })) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
@@ -95,6 +136,25 @@ struct CollectionDocumentView: View {
             } else {
                 Text("Are you sure you want to delete this document? This action cannot be undone.")
             }
+        }
+        .alert("Delete Filtered Documents", isPresented: $confirmBulkDelete) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                if let db = sessionViewModel.selectedDatabase,
+                   let col = sessionViewModel.selectedCollection {
+                    let docsToDelete = findVM.documents
+                    Task {
+                        _ = await findVM.deleteDocuments(
+                            database: db,
+                            collection: col,
+                            documents: docsToDelete,
+                            session: sessionViewModel
+                        )
+                    }
+                }
+            }
+        } message: {
+            Text("Are you sure you want to delete all \(findVM.documents.count) loaded documents matching the query filter? This action cannot be undone.")
         }
     }
 
@@ -159,44 +219,76 @@ struct CollectionDocumentView: View {
     }
 
     private var advancedQueryRow: some View {
-        HStack(spacing: 10) {
-            Text("Sort")
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(.secondary)
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Text("Sort")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
 
-            JSONEditorView(
-                text: $findVM.sortText,
-                errorMessage: $sortError,
-                documentKeys: findVM.documentKeysForCompletion,
-                minHeight: 28
-            )
-            .frame(maxWidth: .infinity)
-            .frame(height: 28)
-            .overlay {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(sortError == nil ? Color.secondary.opacity(0.35) : .red.opacity(0.7), lineWidth: 1)
+                JSONEditorView(
+                    text: $findVM.sortText,
+                    errorMessage: $sortError,
+                    documentKeys: findVM.documentKeysForCompletion,
+                    minHeight: 28
+                )
+                .frame(maxWidth: .infinity)
+                .frame(height: 28)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(sortError == nil ? Color.secondary.opacity(0.35) : .red.opacity(0.7), lineWidth: 1)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .help(sortError ?? "Sort JSON { \"field\": 1 }")
+
+                Text("Projection")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                JSONEditorView(
+                    text: $findVM.projectionText,
+                    errorMessage: $projectionError,
+                    documentKeys: findVM.documentKeysForCompletion,
+                    minHeight: 28
+                )
+                .frame(maxWidth: .infinity)
+                .frame(height: 28)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(projectionError == nil ? Color.secondary.opacity(0.35) : .red.opacity(0.7), lineWidth: 1)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .help(projectionError ?? "Projection JSON { \"field\": 1 }")
             }
-            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-            .help(sortError ?? "Sort JSON { \"field\": 1 }")
 
-            Text("Projection")
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(.secondary)
+            // Action buttons row: Update, Delete, Export
+            HStack(spacing: 10) {
+                Button(action: { showUpdateSheet = true }) {
+                    Label("Update", systemImage: "pencil")
+                        .font(.caption.weight(.medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Update documents matching current filter")
 
-            JSONEditorView(
-                text: $findVM.projectionText,
-                errorMessage: $projectionError,
-                documentKeys: findVM.documentKeysForCompletion,
-                minHeight: 28
-            )
-            .frame(maxWidth: .infinity)
-            .frame(height: 28)
-            .overlay {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(projectionError == nil ? Color.secondary.opacity(0.35) : .red.opacity(0.7), lineWidth: 1)
+                Button(action: { confirmBulkDelete = true }) {
+                    Label("Delete", systemImage: "trash")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Delete documents matching current filter")
+
+                Button(action: { showExportSheet = true }) {
+                    Label("Export", systemImage: "square.and.arrow.up")
+                        .font(.caption.weight(.medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Export collection to JSON/NDJSON")
+
+                Spacer()
             }
-            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-            .help(projectionError ?? "Projection JSON { \"field\": 1 }")
         }
     }
 
