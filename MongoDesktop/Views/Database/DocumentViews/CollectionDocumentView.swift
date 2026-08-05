@@ -17,6 +17,9 @@ struct CollectionDocumentView: View {
     @State private var showUpdateSheet = false
     @State private var showExportSheet = false
     @State private var confirmBulkDelete = false
+    @State private var showExplainSheet = false
+    @State private var explainResult: ExplainResult? = nil
+    @State private var isExplaining = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -114,6 +117,11 @@ struct CollectionDocumentView: View {
                 )
             }
         }
+        .sheet(isPresented: $showExplainSheet) {
+            if let result = explainResult {
+                ExplainResultView(result: result, isPresented: $showExplainSheet)
+            }
+        }
         .alert("Delete \(documentsToDelete?.count == 1 ? "Document" : "Documents")", isPresented: Binding(get: { documentsToDelete != nil }, set: { if !$0 { documentsToDelete = nil } })) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
@@ -192,6 +200,30 @@ struct CollectionDocumentView: View {
                 .help(filterError ?? "Filter JSON { \"field\": \"value\" }")
 
 
+
+                // Explain button
+                Button(action: runExplain) {
+                    Group {
+                        if isExplaining {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                                .frame(width: 14, height: 14)
+                        } else {
+                            Label("Explain", systemImage: "magnifyingglass")
+                                .font(.caption.weight(.semibold))
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .stroke(Color.secondary.opacity(0.5), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(hasSyntaxError || isExplaining)
+                .opacity(hasSyntaxError ? 0.55 : 1)
+                .help("Run explain plan for current query")
 
                 Button(action: runFind) {
                     Label("Run", systemImage: "play.fill")
@@ -340,6 +372,38 @@ struct CollectionDocumentView: View {
               let col = sessionViewModel.selectedCollection else { return }
         findVM.resetPaging()
         Task { await findVM.runFind(database: db, collection: col, session: sessionViewModel) }
+    }
+
+    private func runExplain() {
+        guard !hasSyntaxError else { return }
+        guard let db = sessionViewModel.selectedDatabase,
+              let col = sessionViewModel.selectedCollection else { return }
+        Task {
+            isExplaining = true
+            defer { isExplaining = false }
+            do {
+                let filter = try MongoQueryParsing.parseFilter(findVM.filterText)
+                let sort = findVM.isAdvancedQuery ? try MongoQueryParsing.parseQueryOption(findVM.sortText) : nil
+                let projection = findVM.isAdvancedQuery ? try MongoQueryParsing.parseQueryOption(findVM.projectionText) : nil
+                let raw = try await MongoService.shared.explainFind(
+                    database: db,
+                    collection: col,
+                    filter: filter,
+                    sort: sort,
+                    projection: projection
+                )
+                let queryPlanner = raw["queryPlanner"]?.documentValue
+                let executionStats = raw["executionStats"]?.documentValue
+                explainResult = ExplainResult(
+                    rawDocument: raw,
+                    queryPlanner: queryPlanner,
+                    executionStats: executionStats
+                )
+                showExplainSheet = true
+            } catch {
+                sessionViewModel.lastError = error.localizedDescription
+            }
+        }
     }
 
     private var hasSyntaxError: Bool {

@@ -9,6 +9,9 @@ struct CollectionAggregateView: View {
     @State private var pipelineError: String? = nil
     @Binding var viewMode: DocumentViewMode
     @State private var selection: Set<String> = []
+    @State private var showExplainSheet = false
+    @State private var explainResult: ExplainResult? = nil
+    @State private var isExplaining = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -20,6 +23,29 @@ struct CollectionAggregateView: View {
                 
                 Spacer()
                 
+                Button(action: runExplain) {
+                    Group {
+                        if isExplaining {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                                .frame(width: 14, height: 14)
+                        } else {
+                            Label("Explain", systemImage: "magnifyingglass")
+                                .font(.caption.weight(.semibold))
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .stroke(Color.secondary.opacity(0.5), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(pipelineError != nil || isExplaining)
+                .opacity(pipelineError != nil ? 0.55 : 1)
+                .help("Run explain plan for current pipeline")
+
                 Button(action: runAggregate) {
                     Label("Run Pipeline", systemImage: "play.fill")
                         .font(.caption.weight(.semibold))
@@ -119,6 +145,11 @@ struct CollectionAggregateView: View {
                 }
             }
         }
+        .sheet(isPresented: $showExplainSheet) {
+            if let result = explainResult {
+                ExplainResultView(result: result, isPresented: $showExplainSheet)
+            }
+        }
     }
 
     private var aggregateTableContent: some View {
@@ -150,5 +181,34 @@ struct CollectionAggregateView: View {
         guard let db = sessionViewModel.selectedDatabase,
               let col = sessionViewModel.selectedCollection else { return }
         Task { await aggregateVM.runAggregate(database: db, collection: col, session: sessionViewModel) }
+    }
+
+    private func runExplain() {
+        guard pipelineError == nil else { return }
+        guard let db = sessionViewModel.selectedDatabase,
+              let col = sessionViewModel.selectedCollection else { return }
+        Task {
+            isExplaining = true
+            defer { isExplaining = false }
+            do {
+                let pipeline = try MongoQueryParsing.parsePipeline(aggregateVM.pipelineText)
+                let raw = try await MongoService.shared.explainAggregate(
+                    database: db,
+                    collection: col,
+                    pipeline: pipeline
+                )
+                // Aggregate explain may nest results under stages or queryPlanner
+                let queryPlanner = (raw["queryPlanner"] ?? raw["stages"]?.arrayValue?.first?.documentValue?["$cursor"]?.documentValue?["queryPlanner"])?.documentValue
+                let executionStats = (raw["executionStats"] ?? raw["stages"]?.arrayValue?.first?.documentValue?["$cursor"]?.documentValue?["executionStats"])?.documentValue
+                explainResult = ExplainResult(
+                    rawDocument: raw,
+                    queryPlanner: queryPlanner,
+                    executionStats: executionStats
+                )
+                showExplainSheet = true
+            } catch {
+                sessionViewModel.lastError = error.localizedDescription
+            }
+        }
     }
 }

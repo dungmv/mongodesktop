@@ -724,6 +724,49 @@ actor MongoService {
         return results
     }
 
+    func explainFind(
+        database: String,
+        collection: String,
+        filter: BSONDocument,
+        sort: BSONDocument? = nil,
+        projection: BSONDocument? = nil
+    ) async throws -> BSONDocument {
+        let client = try requireClient()
+
+        var findCmd: BSONDocument = [
+            "find": .string(collection),
+            "filter": .document(filter)
+        ]
+        if let sort, !sort.isEmpty { findCmd["sort"] = .document(sort) }
+        if let projection, !projection.isEmpty { findCmd["projection"] = .document(projection) }
+
+        let command: BSONDocument = [
+            "explain": .document(findCmd),
+            "verbosity": .string("executionStats")
+        ]
+        return try runCommand(client: client, database: database, command: command)
+    }
+
+    func explainAggregate(
+        database: String,
+        collection: String,
+        pipeline: [BSONDocument]
+    ) async throws -> BSONDocument {
+        let client = try requireClient()
+
+        let bsonPipeline = pipeline.map { BSON.document($0) }
+        let aggregateCmd: BSONDocument = [
+            "aggregate": .string(collection),
+            "pipeline": .array(bsonPipeline),
+            "cursor": .document([:])
+        ]
+        let command: BSONDocument = [
+            "explain": .document(aggregateCmd),
+            "verbosity": .string("executionStats")
+        ]
+        return try runCommand(client: client, database: database, command: command)
+    }
+
     func listIndexes(
         database: String,
         collection: String
