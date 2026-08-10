@@ -29,8 +29,8 @@ jobs:
       # ──────────────────────────────────────────────
       # 2. Select Xcode
       # ──────────────────────────────────────────────
-      - name: Select Select Xcode 26.1
-        run: sudo xcode-select -s /Applications/Xcode_26.1.app
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app && xcodebuild -version
 
       # ──────────────────────────────────────────────
       # 3. Install mongo-c-driver via Homebrew
@@ -73,6 +73,8 @@ jobs:
             LIBRARY_SEARCH_PATHS="\$(inherited) $MONGO_LIB" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
             | xcpretty
 
       # ──────────────────────────────────────────────
@@ -115,10 +117,10 @@ jobs:
       # ──────────────────────────────────────────────
       # 8. Sign the DMG
       # ──────────────────────────────────────────────
-      - name: Sign DMG
-        run: |
-          codesign --force --sign - \
-            "${{ steps.dmg.outputs.dmg_path }}"
+      # - name: Sign DMG
+      #   run: |
+      #     codesign --force --sign - \
+      #       "${{ steps.dmg.outputs.dmg_path }}"
 
       # ──────────────────────────────────────────────
       # 9. Create GitHub Release & upload DMG
