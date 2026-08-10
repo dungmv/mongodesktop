@@ -48,6 +48,7 @@ jobs:
       # ──────────────────────────────────────────────
       - name: Build archive
         run: |
+          set -o pipefail
           xcodebuild archive \
             -project "$PROJECT" \
             -scheme   "$SCHEME" \
@@ -58,7 +59,7 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO | xcpretty && exit ${PIPESTATUS[0]}
 
       # ──────────────────────────────────────────────
       # 5. Export .app from archive

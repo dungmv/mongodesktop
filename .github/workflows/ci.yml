@@ -33,6 +33,7 @@ jobs:
       # ──────────────────────────────────────────────
       - name: Build Project
         run: |
+          set -o pipefail
           xcodebuild build \
             -project "$PROJECT" \
             -scheme   "$SCHEME" \
@@ -42,13 +43,14 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO | xcpretty && exit ${PIPESTATUS[0]}
 
       # ──────────────────────────────────────────────
       # 4. Run Tests
       # ──────────────────────────────────────────────
       - name: Run Tests
         run: |
+          set -o pipefail
           xcodebuild test \
             -project "$PROJECT" \
             -scheme   "$SCHEME" \
@@ -58,5 +60,5 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_ALLOWED=NO | xcpretty --report html --output test-results.html && exit ${PIPESTATUS[0]} \
           || echo "No unit test target configured or tests finished"
