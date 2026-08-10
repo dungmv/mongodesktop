@@ -1,4 +1,4 @@
-name: build
+name: Release - Build & Publish
 
 on:
   push:
@@ -24,23 +24,16 @@ jobs:
       # 1. Checkout
       # ──────────────────────────────────────────────
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # ──────────────────────────────────────────────
       # 2. Select Xcode
       # ──────────────────────────────────────────────
-      - name: Select Select Xcode 26.1
-        run: sudo xcode-select -s /Applications/Xcode_26.1.app
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app && xcodebuild -version
 
       # ──────────────────────────────────────────────
-      # 3. Install mongo-c-driver via Homebrew
-      #    (needed for header / lib search paths)
-      # ──────────────────────────────────────────────
-      - name: Install mongo-c-driver
-        run: brew install mongo-c-driver
-
-      # ──────────────────────────────────────────────
-      # 4. Extract version from tag  (v1.2.3 → 1.2.3)
+      # 3. Extract version from tag  (v1.2.3 → 1.2.3)
       # ──────────────────────────────────────────────
       - name: Extract version
         id: version
@@ -51,17 +44,11 @@ jobs:
           echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
 
       # ──────────────────────────────────────────────
-      # 5. Build & Archive
+      # 4. Build & Archive
       # ──────────────────────────────────────────────
       - name: Build archive
         run: |
-          MONGO_INCLUDE=$(brew --prefix mongo-c-driver)/include
-          MONGO_LIB=$(brew --prefix mongo-c-driver)/lib
-
-          # Find versioned include subdirs
-          MONGOC_INCLUDE=$(ls -d "$MONGO_INCLUDE"/mongoc-* 2>/dev/null | head -1)
-          BSON_INCLUDE=$(ls -d "$MONGO_INCLUDE"/bson-* 2>/dev/null | head -1)
-
+          set -o pipefail
           xcodebuild archive \
             -project "$PROJECT" \
             -scheme   "$SCHEME" \
@@ -69,14 +56,13 @@ jobs:
             -archivePath "$RUNNER_TEMP/$APP_NAME.xcarchive" \
             ONLY_ACTIVE_ARCH=YES \
             EXCLUDED_ARCHS="x86_64" \
-            HEADER_SEARCH_PATHS="\$(inherited) $MONGOC_INCLUDE $BSON_INCLUDE" \
-            LIBRARY_SEARCH_PATHS="\$(inherited) $MONGO_LIB" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="-" \
-            | xcpretty
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO | xcpretty && exit ${PIPESTATUS[0]}
 
       # ──────────────────────────────────────────────
-      # 6. Export .app from archive
+      # 5. Export .app from archive
       # ──────────────────────────────────────────────
       - name: Export app
         run: |
@@ -84,44 +70,31 @@ jobs:
           cp -R "$RUNNER_TEMP/$APP_NAME.xcarchive/Products/Applications/$APP_NAME.app" "$RUNNER_TEMP/export/"
 
       # ──────────────────────────────────────────────
-      # 7. Create DMG with create-dmg
+      # 6. Create DMG with hdiutil
       # ──────────────────────────────────────────────
-      - name: Install create-dmg
-        run: brew install create-dmg
-
       - name: Create DMG
         id: dmg
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           DMG_NAME="${APP_NAME}-${VERSION}.dmg"
-          APP_PATH="$RUNNER_TEMP/export/$APP_NAME.app"
 
-          create-dmg \
-            --volname "$APP_NAME $VERSION" \
-            --volicon "$APP_NAME/Assets.xcassets/AppIcon.appiconset/AppIcon-512.png" \
-            --window-pos 200 120 \
-            --window-size 660 400 \
-            --icon-size 128 \
-            --icon "$APP_NAME.app" 190 160 \
-            --hide-extension "$APP_NAME.app" \
-            --app-drop-link 470 160 \
-            "$RUNNER_TEMP/$DMG_NAME" \
-            "$APP_PATH" \
-          || true   # create-dmg exits 1 even on success when no signing
+          # Prepare staging folder
+          STAGING_DIR="$RUNNER_TEMP/dmg_staging"
+          mkdir -p "$STAGING_DIR"
+          cp -R "$RUNNER_TEMP/export/$APP_NAME.app" "$STAGING_DIR/"
+          ln -s /Applications "$STAGING_DIR/Applications"
+
+          # Create DMG via native hdiutil
+          hdiutil create -volname "$APP_NAME $VERSION" \
+            -srcfolder "$STAGING_DIR" \
+            -ov -format UDZO \
+            "$RUNNER_TEMP/$DMG_NAME"
 
           echo "dmg_path=$RUNNER_TEMP/$DMG_NAME" >> "$GITHUB_OUTPUT"
           echo "dmg_name=$DMG_NAME"               >> "$GITHUB_OUTPUT"
 
       # ──────────────────────────────────────────────
-      # 8. Sign the DMG
-      # ──────────────────────────────────────────────
-      - name: Sign DMG
-        run: |
-          codesign --force --sign - \
-            "${{ steps.dmg.outputs.dmg_path }}"
-
-      # ──────────────────────────────────────────────
-      # 9. Create GitHub Release & upload DMG
+      # 7. Create GitHub Release & upload DMG
       # ──────────────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

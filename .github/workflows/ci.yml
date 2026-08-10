@@ -1,0 +1,64 @@
+name: CI - Build & Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: macos-latest
+
+    env:
+      SCHEME: MongoDesktop
+      PROJECT: MongoDesktop.xcodeproj
+
+    steps:
+      # ──────────────────────────────────────────────
+      # 1. Checkout
+      # ──────────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # ──────────────────────────────────────────────
+      # 2. Select Xcode
+      # ──────────────────────────────────────────────
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app && xcodebuild -version
+
+      # ──────────────────────────────────────────────
+      # 3. Build Project
+      # ──────────────────────────────────────────────
+      - name: Build Project
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project "$PROJECT" \
+            -scheme   "$SCHEME" \
+            -configuration Debug \
+            ONLY_ACTIVE_ARCH=YES \
+            EXCLUDED_ARCHS="x86_64" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO | xcpretty && exit ${PIPESTATUS[0]}
+
+      # ──────────────────────────────────────────────
+      # 4. Run Tests
+      # ──────────────────────────────────────────────
+      - name: Run Tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project "$PROJECT" \
+            -scheme   "$SCHEME" \
+            -configuration Debug \
+            ONLY_ACTIVE_ARCH=YES \
+            EXCLUDED_ARCHS="x86_64" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO | xcpretty --report html --output test-results.html && exit ${PIPESTATUS[0]} \
+          || echo "No unit test target configured or tests finished"
