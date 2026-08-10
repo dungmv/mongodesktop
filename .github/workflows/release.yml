@@ -92,30 +92,25 @@ jobs:
           cp -R "$RUNNER_TEMP/$APP_NAME.xcarchive/Products/Applications/$APP_NAME.app" "$RUNNER_TEMP/export/"
 
       # ──────────────────────────────────────────────
-      # 7. Create DMG with create-dmg
+      # 7. Create DMG with hdiutil
       # ──────────────────────────────────────────────
-      - name: Install create-dmg
-        run: brew install create-dmg
-
       - name: Create DMG
         id: dmg
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           DMG_NAME="${APP_NAME}-${VERSION}.dmg"
-          APP_PATH="$RUNNER_TEMP/export/$APP_NAME.app"
 
-          create-dmg \
-            --volname "$APP_NAME $VERSION" \
-            --volicon "$APP_NAME/Assets.xcassets/AppIcon.appiconset/AppIcon-512.png" \
-            --window-pos 200 120 \
-            --window-size 660 400 \
-            --icon-size 128 \
-            --icon "$APP_NAME.app" 190 160 \
-            --hide-extension "$APP_NAME.app" \
-            --app-drop-link 470 160 \
-            "$RUNNER_TEMP/$DMG_NAME" \
-            "$APP_PATH" \
-          || true   # create-dmg exits 1 even on success when no signing
+          # Prepare staging folder
+          STAGING_DIR="$RUNNER_TEMP/dmg_staging"
+          mkdir -p "$STAGING_DIR"
+          cp -R "$RUNNER_TEMP/export/$APP_NAME.app" "$STAGING_DIR/"
+          ln -s /Applications "$STAGING_DIR/Applications"
+
+          # Create DMG via native hdiutil
+          hdiutil create -volname "$APP_NAME $VERSION" \
+            -srcfolder "$STAGING_DIR" \
+            -ov -format UDZO \
+            "$RUNNER_TEMP/$DMG_NAME"
 
           echo "dmg_path=$RUNNER_TEMP/$DMG_NAME" >> "$GITHUB_OUTPUT"
           echo "dmg_name=$DMG_NAME"               >> "$GITHUB_OUTPUT"
