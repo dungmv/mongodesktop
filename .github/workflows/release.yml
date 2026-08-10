@@ -35,14 +35,7 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode.app && xcodebuild -version
 
       # ──────────────────────────────────────────────
-      # 3. Install mongo-c-driver via Homebrew
-      #    (needed for header / lib search paths)
-      # ──────────────────────────────────────────────
-      - name: Install mongo-c-driver
-        run: brew install mongo-c-driver
-
-      # ──────────────────────────────────────────────
-      # 4. Extract version from tag  (v1.2.3 → 1.2.3)
+      # 3. Extract version from tag  (v1.2.3 → 1.2.3)
       # ──────────────────────────────────────────────
       - name: Extract version
         id: version
@@ -57,17 +50,10 @@ jobs:
           echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
 
       # ──────────────────────────────────────────────
-      # 5. Build & Archive
+      # 4. Build & Archive
       # ──────────────────────────────────────────────
       - name: Build archive
         run: |
-          MONGO_INCLUDE=$(brew --prefix mongo-c-driver)/include
-          MONGO_LIB=$(brew --prefix mongo-c-driver)/lib
-
-          # Find versioned include subdirs
-          MONGOC_INCLUDE=$(ls -d "$MONGO_INCLUDE"/mongoc-* 2>/dev/null | head -1)
-          BSON_INCLUDE=$(ls -d "$MONGO_INCLUDE"/bson-* 2>/dev/null | head -1)
-
           xcodebuild archive \
             -project "$PROJECT" \
             -scheme   "$SCHEME" \
@@ -75,13 +61,10 @@ jobs:
             -archivePath "$RUNNER_TEMP/$APP_NAME.xcarchive" \
             ONLY_ACTIVE_ARCH=YES \
             EXCLUDED_ARCHS="x86_64" \
-            HEADER_SEARCH_PATHS="\$(inherited) $MONGOC_INCLUDE $BSON_INCLUDE" \
-            LIBRARY_SEARCH_PATHS="\$(inherited) $MONGO_LIB" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty
+            CODE_SIGNING_ALLOWED=NO
 
       # ──────────────────────────────────────────────
       # 6. Export .app from archive
