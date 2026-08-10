@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*.*.*'
-  pull_request:
-    branches: ["main"]
 
 permissions:
   contents: write
@@ -41,11 +39,7 @@ jobs:
         id: version
         run: |
           TAG="${GITHUB_REF_NAME}"
-          if [[ "$TAG" =~ ^v[0-9] ]]; then
-            VERSION="${TAG#v}"
-          else
-            VERSION="pr-${{ github.event.number || 'test' }}"
-          fi
+          VERSION="${TAG#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
 
@@ -67,7 +61,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       # ──────────────────────────────────────────────
-      # 6. Export .app from archive
+      # 5. Export .app from archive
       # ──────────────────────────────────────────────
       - name: Export app
         run: |
@@ -75,7 +69,7 @@ jobs:
           cp -R "$RUNNER_TEMP/$APP_NAME.xcarchive/Products/Applications/$APP_NAME.app" "$RUNNER_TEMP/export/"
 
       # ──────────────────────────────────────────────
-      # 7. Create DMG with hdiutil
+      # 6. Create DMG with hdiutil
       # ──────────────────────────────────────────────
       - name: Create DMG
         id: dmg
@@ -99,18 +93,9 @@ jobs:
           echo "dmg_name=$DMG_NAME"               >> "$GITHUB_OUTPUT"
 
       # ──────────────────────────────────────────────
-      # 8. Sign the DMG
-      # ──────────────────────────────────────────────
-      # - name: Sign DMG
-      #   run: |
-      #     codesign --force --sign - \
-      #       "${{ steps.dmg.outputs.dmg_path }}"
-
-      # ──────────────────────────────────────────────
-      # 9. Create GitHub Release & upload DMG
+      # 7. Create GitHub Release & upload DMG
       # ──────────────────────────────────────────────
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
