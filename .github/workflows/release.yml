@@ -76,7 +76,8 @@ jobs:
         id: dmg
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          DMG_NAME="${APP_NAME}-${VERSION}.dmg"
+          ARCH=$(uname -m)
+          DMG_NAME="${APP_NAME}-${ARCH}.dmg"
 
           # Prepare staging folder
           STAGING_DIR="$RUNNER_TEMP/dmg_staging"
@@ -85,7 +86,7 @@ jobs:
           ln -s /Applications "$STAGING_DIR/Applications"
 
           # Create DMG via native hdiutil
-          hdiutil create -volname "$APP_NAME $VERSION" \
+          hdiutil create -volname "$APP_NAME" \
             -srcfolder "$STAGING_DIR" \
             -ov -format UDZO \
             "$RUNNER_TEMP/$DMG_NAME"
