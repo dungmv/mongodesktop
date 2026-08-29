@@ -4,8 +4,11 @@ import SwiftBSON
 struct CollectionIndexView: View {
     @EnvironmentObject private var sessionViewModel: DatabaseSessionViewModel
     @EnvironmentObject private var indexVM: IndexQueryViewModel
+    @EnvironmentObject private var findVM: DocumentQueryViewModel
     @State private var isShowingCreateDialog = false
     @State private var selectedIndexId: String? = nil
+    @State private var indexToDrop: String? = nil
+    @State private var showDropConfirmation = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -145,6 +148,24 @@ struct CollectionIndexView: View {
                             }
                         }
                     }
+
+                    TableColumn("Actions") { row in
+                        if row.children != nil && row.name != "_id_" {
+                            Button(action: {
+                                indexToDrop = row.name
+                                showDropConfirmation = true
+                            }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red.opacity(0.85))
+                                    .font(.system(size: 12))
+                                    .padding(4)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .help("Drop Index '\(row.name)'")
+                        }
+                    }
+                    .width(min: 40, ideal: 50, max: 60)
                 }
                 .tableStyle(.inset(alternatesRowBackgrounds: true))
             }
@@ -152,10 +173,26 @@ struct CollectionIndexView: View {
         .onAppear {
             refreshIndexes()
         }
-        .alert("Create Index", isPresented: $isShowingCreateDialog) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("Index creation interface will be added in a future update.")
+        .sheet(isPresented: $isShowingCreateDialog) {
+            if let db = sessionViewModel.selectedDatabase,
+               let col = sessionViewModel.selectedCollection {
+                CreateIndexSheet(
+                    database: db,
+                    collection: col,
+                    documentKeys: findVM.documentKeysForCompletion,
+                    isPresented: $isShowingCreateDialog
+                )
+                .environmentObject(indexVM)
+                .environmentObject(sessionViewModel)
+            }
+        }
+        .confirmationDialog("Drop Index", isPresented: $showDropConfirmation, presenting: indexToDrop) { name in
+            Button("Drop Index", role: .destructive) {
+                dropIndex(name: name)
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: { name in
+            Text("Are you sure you want to drop index '\(name)'? This action cannot be undone.")
         }
     }
     
@@ -163,6 +200,14 @@ struct CollectionIndexView: View {
         guard let db = sessionViewModel.selectedDatabase,
               let col = sessionViewModel.selectedCollection else { return }
         Task { await indexVM.fetchIndexes(database: db, collection: col, session: sessionViewModel) }
+    }
+
+    private func dropIndex(name: String) {
+        guard let db = sessionViewModel.selectedDatabase,
+              let col = sessionViewModel.selectedCollection else { return }
+        Task {
+            try? await indexVM.dropIndex(database: db, collection: col, name: name, session: sessionViewModel)
+        }
     }
     
     private func formatSize(_ bytes: Int64) -> String? {

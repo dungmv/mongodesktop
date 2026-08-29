@@ -842,7 +842,32 @@ actor MongoService {
         return stats
     }
 
+    func createIndexes(
+        database: String,
+        collection: String,
+        indexes: [BSONDocument]
+    ) async throws -> BSONDocument {
+        let client = try requireClient()
+        let bsonIndexes = indexes.map { BSON.document($0) }
+        let command: BSONDocument = [
+            "createIndexes": .string(collection),
+            "indexes": .array(bsonIndexes)
+        ]
+        return try runCommand(client: client, database: database, command: command)
+    }
 
+    func dropIndex(
+        database: String,
+        collection: String,
+        indexName: String
+    ) async throws -> BSONDocument {
+        let client = try requireClient()
+        let command: BSONDocument = [
+            "dropIndexes": .string(collection),
+            "index": .string(indexName)
+        ]
+        return try runCommand(client: client, database: database, command: command)
+    }
 
     private func ping(client: OpaquePointer) throws {
         var command = bson_t()

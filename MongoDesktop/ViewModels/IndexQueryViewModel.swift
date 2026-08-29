@@ -68,6 +68,111 @@ final class IndexQueryViewModel: ObservableObject {
         isLoading = false
     }
 
+    // MARK: - Create Index
+
+    func createIndex(
+        database: String,
+        collection: String,
+        keys: BSONDocument,
+        options: BSONDocument = BSONDocument(),
+        session: DatabaseSessionViewModel
+    ) async throws {
+        isLoading = true
+        error = nil
+        let start = Date()
+
+        var indexDoc: BSONDocument = [
+            "key": .document(keys)
+        ]
+        for (k, v) in options {
+            indexDoc[k] = v
+        }
+
+        let queryText = options.isEmpty
+            ? "db.\(collection).createIndex(\(keys.toRelaxedExtendedJSONString()))"
+            : "db.\(collection).createIndex(\(keys.toRelaxedExtendedJSONString()), \(options.toRelaxedExtendedJSONString()))"
+
+        do {
+            _ = try await mongoService.createIndexes(
+                database: database,
+                collection: collection,
+                indexes: [indexDoc]
+            )
+            let duration = Date().timeIntervalSince(start)
+            QueryHistoryStore.shared.record(
+                database: database,
+                collection: collection,
+                queryType: .index,
+                queryText: queryText,
+                duration: duration,
+                resultCount: 1
+            )
+            await fetchIndexes(database: database, collection: collection, session: session)
+        } catch {
+            let duration = Date().timeIntervalSince(start)
+            self.error = error.localizedDescription
+            session.lastError = error.localizedDescription
+            QueryHistoryStore.shared.record(
+                database: database,
+                collection: collection,
+                queryType: .index,
+                queryText: queryText,
+                duration: duration,
+                isError: true,
+                errorMessage: error.localizedDescription
+            )
+            isLoading = false
+            throw error
+        }
+    }
+
+    // MARK: - Drop Index
+
+    func dropIndex(
+        database: String,
+        collection: String,
+        name: String,
+        session: DatabaseSessionViewModel
+    ) async throws {
+        isLoading = true
+        error = nil
+        let start = Date()
+        let queryText = "db.\(collection).dropIndex(\"\(name)\")"
+
+        do {
+            _ = try await mongoService.dropIndex(
+                database: database,
+                collection: collection,
+                indexName: name
+            )
+            let duration = Date().timeIntervalSince(start)
+            QueryHistoryStore.shared.record(
+                database: database,
+                collection: collection,
+                queryType: .index,
+                queryText: queryText,
+                duration: duration,
+                resultCount: 1
+            )
+            await fetchIndexes(database: database, collection: collection, session: session)
+        } catch {
+            let duration = Date().timeIntervalSince(start)
+            self.error = error.localizedDescription
+            session.lastError = error.localizedDescription
+            QueryHistoryStore.shared.record(
+                database: database,
+                collection: collection,
+                queryType: .index,
+                queryText: queryText,
+                duration: duration,
+                isError: true,
+                errorMessage: error.localizedDescription
+            )
+            isLoading = false
+            throw error
+        }
+    }
+
     // MARK: - Clear
 
     func clear() {
