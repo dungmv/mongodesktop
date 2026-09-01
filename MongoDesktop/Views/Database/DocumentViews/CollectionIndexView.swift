@@ -269,7 +269,7 @@ struct CollectionIndexView: View {
             let isUnique = doc["unique"]?.boolValue ?? false
             let isCompound = key.count > 1
             let isSparse = doc["sparse"]?.boolValue ?? false
-            let ttl = doc["expireAfterSeconds"]?.intValue
+            let ttl = doc["expireAfterSeconds"]?.int32Value
             
             let v = doc["v"]
             let version: String
@@ -335,7 +335,7 @@ struct IndexRow: Identifiable {
     let isUnique: Bool
     let isCompound: Bool
     let isSparse: Bool
-    let ttl: Int?
+    let ttl: Int32?
     let version: String
     var children: [IndexRow]?
 }
