@@ -311,7 +311,7 @@ struct CollectionUpdateSheet: View {
             id: id,
             index: index,
             document: document,
-            nodes: JSONNode.rootNodes(for: document, timeZone: TimeZone.current)
+            timeZone: TimeZone.current
         )
     }
 

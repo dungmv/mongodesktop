@@ -151,7 +151,7 @@ struct DocumentTableView: View {
                             id: row.id,
                             index: index,
                             document: row.document,
-                            nodes: JSONNode.rootNodes(for: row.document, timeZone: globalSettings.displayTimeZone)
+                            timeZone: globalSettings.displayTimeZone
                         )
                         JSONDocumentCardContainer(wrapper: wrapper)
                             .padding()
