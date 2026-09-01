@@ -89,8 +89,8 @@ final class IndexQueryViewModel: ObservableObject {
         }
 
         let queryText = options.isEmpty
-            ? "db.\(collection).createIndex(\(keys.toRelaxedExtendedJSONString()))"
-            : "db.\(collection).createIndex(\(keys.toRelaxedExtendedJSONString()), \(options.toRelaxedExtendedJSONString()))"
+            ? "db.\(collection).createIndex(\(keys.toExtendedJSONString()))"
+            : "db.\(collection).createIndex(\(keys.toExtendedJSONString()), \(options.toExtendedJSONString()))"
 
         do {
             _ = try await mongoService.createIndexes(

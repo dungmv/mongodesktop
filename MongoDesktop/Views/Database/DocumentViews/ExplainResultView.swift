@@ -215,7 +215,7 @@ struct ExplainResultView: View {
 
     private var rawOutputContent: some View {
         ScrollView {
-            Text(result.rawDocument.toRelaxedExtendedJSONString())
+            Text(result.rawDocument.toExtendedJSONString())
                 .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(.primary)
                 .textSelection(.enabled)

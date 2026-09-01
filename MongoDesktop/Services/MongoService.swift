@@ -657,7 +657,7 @@ actor MongoService {
             }
             if let docPtr {
                 if let doc = try? documentFromBson(docPtr) {
-                    let jsonString = doc.toRelaxedExtendedJSONString()
+                    let jsonString = doc.toExtendedJSONString()
                     
                     var line = ""
                     if format == .jsonArray {

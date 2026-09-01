@@ -25,7 +25,7 @@ struct DocumentEditorSheet: View {
         
         let initialText: String
         if let initialDocument {
-            initialText = initialDocument.toRelaxedExtendedJSONString()
+            initialText = initialDocument.toExtendedJSONString()
         } else {
             initialText = "{\n  \n}"
         }

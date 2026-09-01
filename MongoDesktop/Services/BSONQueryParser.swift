@@ -418,7 +418,6 @@ enum BSONQueryParser {
                     return "{\"$binary\": {\"base64\": \"\(base64)\", \"subType\": \"04\"}}"
                 }
             }
-            let rawArgs = args.map(\.raw).joined()
             return "{\"$binary\": {\"base64\": \"\", \"subType\": \"04\"}}"
             
         case "BinData":
@@ -436,7 +435,6 @@ enum BSONQueryParser {
                 }
                 return "{\"$binary\": {\"base64\": \"\(base64Str)\", \"subType\": \"\(subTypeHex)\"}}"
             }
-            let rawArgs = args.map(\.raw).joined()
             return "{\"$binary\": {\"base64\": \"\", \"subType\": \"00\"}}"
             
         case "MinKey":
@@ -451,7 +449,6 @@ enum BSONQueryParser {
                case .number(let iStr) = clean[1].kind {
                 return "{\"$timestamp\": {\"t\": \(tStr), \"i\": \(iStr)}}"
             }
-            let rawArgs = args.map(\.raw).joined()
             return "{\"$timestamp\": {\"t\": 0, \"i\": 0}}"
             
         case "RegExp":
@@ -465,7 +462,6 @@ enum BSONQueryParser {
                 let escapedPattern = escapeStringForJSON(pat)
                 return "{\"$regularExpression\": {\"pattern\": \"\(escapedPattern)\", \"options\": \"\(options)\"}}"
             }
-            let rawArgs = args.map(\.raw).joined()
             return "{\"$regularExpression\": {\"pattern\": \"\", \"options\": \"\"}}"
             
         default:

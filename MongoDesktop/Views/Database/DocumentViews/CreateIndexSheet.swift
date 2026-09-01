@@ -516,11 +516,11 @@ struct CreateIndexSheet: View {
         let keyDoc = buildKeyDocument()
         let optionsDoc = buildOptionsDocument()
 
-        let keyJson = keyDoc.isEmpty ? "{ ... }" : keyDoc.toRelaxedExtendedJSONString()
+        let keyJson = keyDoc.isEmpty ? "{ ... }" : keyDoc.toExtendedJSONString()
         if optionsDoc.isEmpty {
             return "db.\(collection).createIndex(\(keyJson))"
         } else {
-            return "db.\(collection).createIndex(\(keyJson), \(optionsDoc.toRelaxedExtendedJSONString()))"
+            return "db.\(collection).createIndex(\(keyJson), \(optionsDoc.toExtendedJSONString()))"
         }
     }
 

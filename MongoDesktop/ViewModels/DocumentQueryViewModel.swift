@@ -209,7 +209,7 @@ final class DocumentQueryViewModel: ObservableObject {
         isLoading = true
         session.lastError = nil
         let start = Date()
-        let queryLabel = document.toRelaxedExtendedJSONString()
+        let queryLabel = document.toExtendedJSONString()
         do {
             try await mongoService.insertDocument(database: database, collection: collection, document: document)
             let duration = Date().timeIntervalSince(start)
@@ -269,7 +269,7 @@ final class DocumentQueryViewModel: ObservableObject {
             }
         }
 
-        let queryLabel = "Filter: \(filter.toRelaxedExtendedJSONString()), Replacement: \(finalReplacement.toRelaxedExtendedJSONString())"
+        let queryLabel = "Filter: \(filter.toExtendedJSONString()), Replacement: \(finalReplacement.toExtendedJSONString())"
 
         do {
             try await mongoService.replaceDocument(
@@ -325,7 +325,7 @@ final class DocumentQueryViewModel: ObservableObject {
             }
         }
 
-        let queryLabel = "Deleted \(documents.count) documents. Filters: " + filters.map { $0.toRelaxedExtendedJSONString() }.joined(separator: ", ")
+        let queryLabel = "Deleted \(documents.count) documents. Filters: " + filters.map { $0.toExtendedJSONString() }.joined(separator: ", ")
 
         do {
             for filter in filters {
@@ -369,7 +369,7 @@ final class DocumentQueryViewModel: ObservableObject {
         isLoading = true
         session.lastError = nil
         let start = Date()
-        let queryLabel = "Filter: \(filter.toRelaxedExtendedJSONString()), Update: \(update.toRelaxedExtendedJSONString())"
+        let queryLabel = "Filter: \(filter.toExtendedJSONString()), Update: \(update.toExtendedJSONString())"
         do {
             let count = try await mongoService.updateDocuments(
                 database: database,

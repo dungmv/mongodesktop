@@ -32,7 +32,7 @@ struct JSONTreeView: View {
             
             Button {
                 NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(self.document.toRelaxedExtendedJSONString(), forType: .string)
+                NSPasteboard.general.setString(self.document.toExtendedJSONString(), forType: .string)
             } label: {
                 Label("Copy JSON", systemImage: "curlybraces")
             }
@@ -98,7 +98,7 @@ struct JSONNode: Identifiable {
     var copyValue: String {
         switch rawValue {
         case .document(let doc):
-            return doc.toRelaxedExtendedJSONString()
+            return doc.toExtendedJSONString()
         case .array:
             return String(describing: rawValue)
         default:
@@ -211,8 +211,9 @@ struct JSONNodeView: View {
     private var rowLabel: Text {
         let valueText = Text(node.value).foregroundStyle(valueColor)
         guard let key = node.key else { return valueText }
-        return Text("\(key): ")
-            .foregroundStyle(Color(red: 0.4, green: 0.7, blue: 1.0)) + valueText
+        let keyText = Text("\(key): ")
+            .foregroundStyle(Color(red: 0.4, green: 0.7, blue: 1.0))
+        return Text("\(keyText)\(valueText)")
     }
 
     private var valueColor: Color {

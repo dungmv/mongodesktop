@@ -110,7 +110,7 @@ struct DocumentTableView: View {
                     
                     Button {
                         NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(row.document.toRelaxedExtendedJSONString(), forType: .string)
+                        NSPasteboard.general.setString(row.document.toExtendedJSONString(), forType: .string)
                     } label: {
                         Label("Copy JSON", systemImage: "curlybraces")
                     }
