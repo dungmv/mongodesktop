@@ -95,19 +95,22 @@ struct JSONDocumentWrapper: Identifiable {
     let id: String
     let index: Int
     let document: BSONDocument
+    let timeZone: TimeZone
     let attributedText: AttributedString
 
     init(id: String, index: Int, document: BSONDocument, timeZone: TimeZone = .current) {
         self.id = id
         self.index = index
         self.document = document
+        self.timeZone = timeZone
         self.attributedText = BSONAttributedStringFormatter(timeZone: timeZone).format(document: document)
     }
 
-    init(id: String, index: Int, document: BSONDocument, attributedText: AttributedString) {
+    init(id: String, index: Int, document: BSONDocument, timeZone: TimeZone = .current, attributedText: AttributedString) {
         self.id = id
         self.index = index
         self.document = document
+        self.timeZone = timeZone
         self.attributedText = attributedText
     }
 }

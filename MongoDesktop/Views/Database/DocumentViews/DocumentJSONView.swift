@@ -86,15 +86,30 @@ struct JSONDocumentCard: View {
     let wrapper: JSONDocumentWrapper
     var onEdit: ((BSONDocument) -> Void)? = nil
     var onDelete: ((BSONDocument) -> Void)? = nil
+    @State private var expandedPaths: Set<String> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(wrapper.attributedText)
+            Text(currentAttributedText)
                 .font(.system(.callout, design: .monospaced))
                 .textSelection(.enabled)
                 .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(12)
+                .environment(\.openURL, OpenURLAction { url in
+                    guard url.scheme == "mongofold" else { return .systemAction }
+                    let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                    guard let path = components?.queryItems?.first(where: { $0.name == "path" })?.value, !path.isEmpty else {
+                        return .handled
+                    }
+                    if expandedPaths.contains(path) {
+                        expandedPaths.remove(path)
+                    } else {
+                        expandedPaths.insert(path)
+                    }
+                    return .handled
+                })
         }
         .background {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -104,6 +119,16 @@ struct JSONDocumentCard: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Color.primary.opacity(0.07), lineWidth: 1)
         )
+    }
+
+    private var currentAttributedText: AttributedString {
+        if expandedPaths.isEmpty {
+            return wrapper.attributedText
+        }
+        return BSONAttributedStringFormatter(
+            timeZone: wrapper.timeZone,
+            expandedPaths: expandedPaths
+        ).format(document: wrapper.document)
     }
 }
 
