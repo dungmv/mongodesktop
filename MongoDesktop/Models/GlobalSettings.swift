@@ -13,11 +13,19 @@ final class GlobalSettings: ObservableObject {
         }
     }
 
+    /// Polling interval (seconds) for real-time performance monitoring (default: 1.0s).
+    @Published var performancePollingInterval: Double {
+        didSet {
+            defaults.set(performancePollingInterval, forKey: Self.performancePollingIntervalKey)
+        }
+    }
+
     var displayTimeZone: TimeZone {
         TimeZone(identifier: displayTimeZoneId) ?? .current
     }
 
     private static let displayTimeZoneIdKey = "displayTimeZoneId"
+    private static let performancePollingIntervalKey = "performancePollingInterval"
     private let defaults = UserDefaults.standard
 
     private init() {
@@ -25,6 +33,13 @@ final class GlobalSettings: ObservableObject {
             displayTimeZoneId = saved
         } else {
             displayTimeZoneId = TimeZone.current.identifier
+        }
+
+        let savedInterval = defaults.double(forKey: Self.performancePollingIntervalKey)
+        if savedInterval > 0 {
+            performancePollingInterval = savedInterval
+        } else {
+            performancePollingInterval = 1.0
         }
     }
 }

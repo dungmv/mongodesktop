@@ -31,7 +31,9 @@ final class DatabaseWindowViewModel: ObservableObject {
 
     func openTab(database: String, collection: String, session: DatabaseSessionViewModel) {
         if let existingTab = tabs.first(where: {
-            $0.viewModel.databaseName == database && $0.viewModel.collectionName == collection
+            !$0.viewModel.isPerformanceTab &&
+            $0.viewModel.databaseName == database &&
+            $0.viewModel.collectionName == collection
         }) {
             selectedTabId = existingTab.id
             session.selectCollection(database: database, collection: collection)
@@ -40,6 +42,7 @@ final class DatabaseWindowViewModel: ObservableObject {
 
         if let selectedTabId,
            let index = tabs.firstIndex(where: { $0.id == selectedTabId }),
+           !tabs[index].viewModel.isPerformanceTab,
            tabs[index].viewModel.collectionName == nil {
             let viewModel = tabs[index].viewModel
             viewModel.openCollection(database: database, collection: collection, session: session)
@@ -54,10 +57,34 @@ final class DatabaseWindowViewModel: ObservableObject {
         selectedTabId = tab.id
     }
 
+    func openPerformanceTab(session: DatabaseSessionViewModel) {
+        if let existingTab = tabs.first(where: { $0.viewModel.isPerformanceTab }) {
+            selectedTabId = existingTab.id
+            return
+        }
+
+        if let selectedTabId,
+           let index = tabs.firstIndex(where: { $0.id == selectedTabId }),
+           !tabs[index].viewModel.isPerformanceTab,
+           tabs[index].viewModel.collectionName == nil {
+            tabs[index].viewModel.openPerformance()
+            return
+        }
+
+        let viewModel = QueryTabViewModel()
+        viewModel.openPerformance()
+
+        let tab = Tab(id: UUID(), viewModel: viewModel)
+        tabs.append(tab)
+        selectedTabId = tab.id
+    }
+
     func selectTab(_ id: UUID, session: DatabaseSessionViewModel) {
         guard let tab = tabs.first(where: { $0.id == id }) else { return }
         selectedTabId = id
-        session.selectCollection(database: tab.viewModel.databaseName, collection: tab.viewModel.collectionName)
+        if !tab.viewModel.isPerformanceTab {
+            session.selectCollection(database: tab.viewModel.databaseName, collection: tab.viewModel.collectionName)
+        }
     }
 
     func closeTab(_ id: UUID, session: DatabaseSessionViewModel) {
@@ -73,10 +100,12 @@ final class DatabaseWindowViewModel: ObservableObject {
             let newIndex = min(index, tabs.count - 1)
             let replacement = tabs[newIndex]
             selectedTabId = replacement.id
-            session.selectCollection(
-                database: replacement.viewModel.databaseName,
-                collection: replacement.viewModel.collectionName
-            )
+            if !replacement.viewModel.isPerformanceTab {
+                session.selectCollection(
+                    database: replacement.viewModel.databaseName,
+                    collection: replacement.viewModel.collectionName
+                )
+            }
         }
     }
 
@@ -102,11 +131,15 @@ final class DatabaseWindowViewModel: ObservableObject {
             },
             open: { [weak self] database, collection in
                 self?.openTab(database: database, collection: collection, session: session)
+            },
+            openPerformance: { [weak self] in
+                self?.openPerformanceTab(session: session)
             }
         )
     }
 
     private func tabTitle(for viewModel: QueryTabViewModel, fallbackIndex: Int) -> String {
+        if viewModel.isPerformanceTab { return "Performance" }
         if !viewModel.title.isEmpty { return viewModel.title }
         if let collection = viewModel.collectionName, !collection.isEmpty { return collection }
         if let database = viewModel.databaseName, !database.isEmpty { return database }

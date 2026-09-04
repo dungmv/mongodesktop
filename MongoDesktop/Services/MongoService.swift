@@ -869,6 +869,64 @@ actor MongoService {
         return try runCommand(client: client, database: database, command: command)
     }
 
+    func fetchServerStatus(database: String? = nil) async throws -> BSONDocument {
+        let client = try requireClient()
+        var targets = ["admin"]
+        if let database, !database.isEmpty, database != "admin" {
+            targets.insert(database, at: 0)
+        }
+
+        var lastErrorMsg = ""
+        for db in targets {
+            do {
+                #if DEBUG
+                print("[Performance] Trying serverStatus on database '\(db)'...")
+                #endif
+                let reply = try runCommand(client: client, database: db, command: ["serverStatus": .int32(1)])
+                #if DEBUG
+                print("[Performance] Successfully fetched serverStatus from '\(db)'")
+                #endif
+                return reply
+            } catch {
+                #if DEBUG
+                print("[Performance] serverStatus on '\(db)' failed: \(error.localizedDescription)")
+                #endif
+                lastErrorMsg = error.localizedDescription
+            }
+        }
+        throw MongoServiceError.commandFailed(lastErrorMsg.isEmpty ? "serverStatus failed" : lastErrorMsg)
+    }
+
+    func fetchDbStats(database: String) async throws -> BSONDocument {
+        let client = try requireClient()
+        return try runCommand(client: client, database: database, command: ["dbStats": .int32(1)])
+    }
+
+    func fetchTop() async throws -> BSONDocument {
+        let client = try requireClient()
+        return try runCommand(client: client, database: "admin", command: ["top": .int32(1)])
+    }
+
+    func fetchCurrentOps(database: String? = nil) async throws -> [BSONDocument] {
+        let client = try requireClient()
+        var targets = ["admin"]
+        if let database, !database.isEmpty, database != "admin" {
+            targets.append(database)
+        }
+        for db in targets {
+            if let reply = try? runCommand(client: client, database: db, command: ["currentOp": .int32(1)]),
+               case let .array(inprog) = reply["inprog"] {
+                return inprog.compactMap { item in
+                    if case let .document(doc) = item {
+                        return doc
+                    }
+                    return nil
+                }
+            }
+        }
+        return []
+    }
+
     private func ping(client: OpaquePointer) throws {
         var command = bson_t()
         bson_init(&command)

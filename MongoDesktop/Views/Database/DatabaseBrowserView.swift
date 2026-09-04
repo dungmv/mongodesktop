@@ -11,6 +11,7 @@ struct DatabaseBrowserView: View {
     @EnvironmentObject private var aggregateVM: AggregateQueryViewModel
     @EnvironmentObject private var indexVM: IndexQueryViewModel
     @Environment(\.addDatabaseTab) private var addDatabaseTab
+    @Environment(\.databaseTabContext) private var tabContext
     @State private var showServerInfo = false
     @State private var showQueryConsole = false
 
@@ -53,11 +54,12 @@ struct DatabaseBrowserView: View {
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
-                Button(action: addDatabaseTab) {
-                    Image(systemName: "plus")
-                        .font(.caption.weight(.semibold))
+                Button(action: {
+                    tabContext?.openPerformance()
+                }) {
+                    Image(systemName: "speedometer")
                 }
-                .help("New Tab")
+                .help("Performance")
 
                 Button(action: {
                     withAnimation(.spring(duration: 0.3)) {

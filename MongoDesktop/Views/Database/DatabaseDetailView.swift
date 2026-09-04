@@ -26,7 +26,9 @@ struct DatabaseDetailView: View {
                 }
             }
 
-            if sessionViewModel.selectedDatabase == nil || sessionViewModel.selectedCollection == nil {
+            if tabViewModel.isPerformanceTab {
+                PerformanceView()
+            } else if sessionViewModel.selectedDatabase == nil || sessionViewModel.selectedCollection == nil {
                 WelcomeScreenView()
             } else {
                 VStack(spacing: 0) {

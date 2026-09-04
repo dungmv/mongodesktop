@@ -20,7 +20,32 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
+            // Performance Monitoring Setting
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Performance Monitor")
+                    .font(.headline)
+
+                HStack {
+                    Text("Sample Interval:")
+                        .font(.callout)
+                    Picker("", selection: $globalSettings.performancePollingInterval) {
+                        Text("1 second (Default)").tag(1.0)
+                        Text("2 seconds").tag(2.0)
+                        Text("3 seconds").tag(3.0)
+                        Text("5 seconds").tag(5.0)
+                        Text("10 seconds").tag(10.0)
+                    }
+                    .frame(width: 180)
+                    Spacer()
+                }
+                Text("Frequency of polling serverStatus, top, and currentOp metrics.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
             Text("Timezone")
                 .font(.headline)
 

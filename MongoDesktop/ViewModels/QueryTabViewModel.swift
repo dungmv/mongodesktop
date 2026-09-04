@@ -29,6 +29,7 @@ final class QueryTabViewModel: ObservableObject {
     @Published var databaseName: String?
     @Published var collectionName: String?
     @Published var selectedTab: CollectionTab = .document
+    @Published var isPerformanceTab: Bool = false
 
     // MARK: - Sub-ViewModels
 
@@ -47,6 +48,7 @@ final class QueryTabViewModel: ObservableObject {
     // MARK: - Configuration
 
     func configure(database: String?, collection: String?) {
+        isPerformanceTab = false
         if let database, !database.isEmpty {
             databaseName = database
         }
@@ -59,9 +61,17 @@ final class QueryTabViewModel: ObservableObject {
     }
 
     func openCollection(database: String, collection: String, session: DatabaseSessionViewModel) {
+        isPerformanceTab = false
         configure(database: database, collection: collection)
         session.selectCollection(database: database, collection: collection)
         loadInitialDocuments(database: database, collection: collection, session: session)
+    }
+
+    func openPerformance() {
+        isPerformanceTab = true
+        databaseName = nil
+        collectionName = nil
+        title = "Performance"
     }
 
     func loadInitialDocumentsIfPossible(session: DatabaseSessionViewModel) {
@@ -70,6 +80,7 @@ final class QueryTabViewModel: ObservableObject {
     }
 
     func clearSelection() {
+        isPerformanceTab = false
         databaseName = nil
         collectionName = nil
         title = ""
