@@ -7,19 +7,24 @@ struct DocumentJSONView: View {
     let documents: [BSONDocument]
     let timeZone: TimeZone
     let isLoading: Bool
-    let onEdit: (BSONDocument) -> Void
-    let onDelete: ([BSONDocument]) -> Void
+    let onSave: ((_ original: BSONDocument, _ replacement: BSONDocument) async -> Bool)?
+    let onEdit: ((BSONDocument) -> Void)?
+    let onDelete: (([BSONDocument]) -> Void)?
+
+    @State private var editingDocumentID: String? = nil
 
     init(
         documents: [BSONDocument],
         timeZone: TimeZone,
         isLoading: Bool,
-        onEdit: @escaping (BSONDocument) -> Void = { _ in },
-        onDelete: @escaping ([BSONDocument]) -> Void = { _ in }
+        onSave: ((_ original: BSONDocument, _ replacement: BSONDocument) async -> Bool)? = nil,
+        onEdit: ((BSONDocument) -> Void)? = nil,
+        onDelete: (([BSONDocument]) -> Void)? = nil
     ) {
         self.documents = documents
         self.timeZone = timeZone
         self.isLoading = isLoading
+        self.onSave = onSave
         self.onEdit = onEdit
         self.onDelete = onDelete
     }
@@ -47,10 +52,30 @@ struct DocumentJSONView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
                     ForEach(documents.indices, id: \.self) { index in
+                        let doc = documents[index]
+                        let itemWrapper = wrapper(for: doc, index: index)
                         JSONDocumentCard(
-                            wrapper: wrapper(for: documents[index], index: index),
-                            onEdit: onEdit,
-                            onDelete: { doc in onDelete([doc]) }
+                            wrapper: itemWrapper,
+                            isEditing: editingDocumentID == itemWrapper.id,
+                            onRequestEdit: onSave != nil ? {
+                                editingDocumentID = itemWrapper.id
+                            } : nil,
+                            onCancelEdit: {
+                                if editingDocumentID == itemWrapper.id {
+                                    editingDocumentID = nil
+                                }
+                            },
+                            onSave: { updatedDoc in
+                                guard let onSave else { return false }
+                                let success = await onSave(doc, updatedDoc)
+                                if success {
+                                    editingDocumentID = nil
+                                }
+                                return success
+                            },
+                            onDelete: onDelete != nil ? { targetDoc in
+                                onDelete?([targetDoc])
+                            } : nil
                         )
                     }
                 }
@@ -84,11 +109,38 @@ struct DocumentJSONView: View {
 
 struct JSONDocumentCard: View {
     let wrapper: JSONDocumentWrapper
-    var onEdit: ((BSONDocument) -> Void)? = nil
+    var isEditing: Bool = false
+    var onRequestEdit: (() -> Void)? = nil
+    var onCancelEdit: (() -> Void)? = nil
+    var onSave: ((BSONDocument) async -> Bool)? = nil
     var onDelete: ((BSONDocument) -> Void)? = nil
+
     @State private var expandedPaths: Set<String> = []
+    @State private var isHovered: Bool = false
 
     var body: some View {
+        Group {
+            if isEditing {
+                EditableDocumentOutlineView(
+                    originalDocument: wrapper.document,
+                    timeZone: wrapper.timeZone,
+                    onSave: { updatedDoc in
+                        if let onSave {
+                            return await onSave(updatedDoc)
+                        }
+                        return false
+                    },
+                    onCancel: {
+                        onCancelEdit?()
+                    }
+                )
+            } else {
+                textViewCard
+            }
+        }
+    }
+
+    private var textViewCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(currentAttributedText)
                 .font(.system(.callout, design: .monospaced))
@@ -119,6 +171,54 @@ struct JSONDocumentCard: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Color.primary.opacity(0.07), lineWidth: 1)
         )
+        .overlay(alignment: .topTrailing) {
+            if onRequestEdit != nil || onDelete != nil {
+                actionButtons
+                    .opacity(isHovered ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.15), value: isHovered)
+                    .padding(8)
+            }
+        }
+        .onHover { hovering in
+            isHovered = hovering
+        }
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 4) {
+            if let onRequestEdit {
+                Button(action: onRequestEdit) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(width: 24, height: 24)
+                        .foregroundStyle(.primary)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Edit document (Outline Tree)")
+            }
+
+            if let onDelete {
+                Button(action: {
+                    onDelete(wrapper.document)
+                }) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(width: 24, height: 24)
+                        .foregroundStyle(.red.opacity(0.85))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Delete document")
+            }
+        }
+        .padding(3)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .stroke(Color.primary.opacity(0.12), lineWidth: 0.8)
+        )
+        .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 1)
     }
 
     private var currentAttributedText: AttributedString {

@@ -359,6 +359,17 @@ struct CollectionDocumentView: View {
             documents: findVM.documents,
             timeZone: globalSettings.displayTimeZone,
             isLoading: findVM.isLoading,
+            onSave: { originalDoc, updatedDoc in
+                guard let db = sessionViewModel.selectedDatabase,
+                      let col = sessionViewModel.selectedCollection else { return false }
+                return await findVM.replaceDocument(
+                    database: db,
+                    collection: col,
+                    originalDocument: originalDoc,
+                    replacement: updatedDoc,
+                    session: sessionViewModel
+                )
+            },
             onEdit: { doc in editingDocument = doc },
             onDelete: { docs in documentsToDelete = docs }
         )
